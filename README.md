@@ -59,15 +59,20 @@ claude --model opus
 Then run:
 
 ```text
-/orchestrator:orchestrate <objective, authorization, artifacts, and acceptance criteria>
+/orchestrator:orchestrate continue
 ```
 
 Use `/workflows` to inspect phases, queue activity, agents, prompts, tools,
 tokens, and results. Claude Code saves workflow progress for session resumption.
 
-In a repository with `.beads`, the skill claims an explicitly named issue or
-creates a dedicated Bead. It appends one serialized checkpoint after the native
-workflow returns and closes the issue only after deterministic acceptance.
+In a repository with `.beads`, the skill first resumes the highest-priority
+in-progress item. If none exists, it claims the highest-priority
+dependency-ready item. Priority ties use most recent update and then issue ID.
+A process-held lease prevents live clients from selecting the same Bead. An
+explicit ID is only an override. An empty queue stops cleanly rather than
+creating a placeholder. The skill appends one serialized checkpoint after the
+native workflow returns and closes the issue only after deterministic
+acceptance.
 
 ## Completion Contract
 

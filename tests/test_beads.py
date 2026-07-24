@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -10,6 +11,63 @@ from orchestrator.beads import BeadsBridge
 
 
 class BeadsBridgeTests(unittest.TestCase):
+    def test_candidates_prefer_in_progress_then_priority_then_recency(self) -> None:
+        candidates = [
+            {
+                "id": "ios-ready-p0",
+                "status": "open",
+                "priority": 0,
+                "updated_at": "2026-07-24T16:00:00Z",
+            },
+            {
+                "id": "ios-active-p1-old",
+                "status": "in_progress",
+                "priority": "P1",
+                "updated_at": "2026-07-23T16:00:00Z",
+            },
+            {
+                "id": "ios-active-p1-new",
+                "status": "in_progress",
+                "priority": 1,
+                "updated_at": "2026-07-24T16:00:00Z",
+            },
+        ]
+
+        ranked = BeadsBridge.rank_candidates(candidates)
+
+        self.assertEqual(
+            [item["id"] for item in ranked],
+            ["ios-active-p1-new", "ios-active-p1-old", "ios-ready-p0"],
+        )
+
+    def test_resolved_task_hydrates_continue_from_bead(self) -> None:
+        snapshot = {
+            "id": "ios-123",
+            "title": "Automate boot ROM",
+            "description": "Continue the verified USB state machine.",
+            "acceptance_criteria": "- cold boot passes\n- reconnect passes",
+        }
+
+        task = BeadsBridge._resolved_task("continue", snapshot)
+        acceptance = BeadsBridge._resolved_acceptance(snapshot, [])
+
+        self.assertIn("Continue Bead ios-123: Automate boot ROM", task)
+        self.assertIn("Continue the verified USB state machine.", task)
+        self.assertEqual(acceptance, ["cold boot passes", "reconnect passes"])
+
+    def test_issue_lease_prevents_duplicate_live_client(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".beads").mkdir()
+            first = BeadsBridge()
+            second = BeadsBridge()
+
+            self.assertTrue(first._acquire_issue_lease(root, "ios-123"))
+            self.assertFalse(second._acquire_issue_lease(root, "ios-123"))
+            first._release_issue_lease(root, "ios-123")
+            self.assertTrue(second._acquire_issue_lease(root, "ios-123"))
+            second._release_issue_lease(root, "ios-123")
+
     @patch("orchestrator.beads.subprocess.run")
     def test_snapshot_is_bounded_and_uses_workspace(self, run) -> None:
         run.return_value = SimpleNamespace(

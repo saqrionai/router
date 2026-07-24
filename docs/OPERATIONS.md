@@ -48,13 +48,14 @@ claude --model opus
 Start substantial work with:
 
 ```text
-/orchestrator:orchestrate <objective and exact acceptance criteria>
+/orchestrator:orchestrate continue
 ```
 
 The skill performs this sequence:
 
-1. derive exact acceptance criteria;
-2. claim or create a Bead when `.beads` is present;
+1. automatically resume the highest-priority in-progress Bead, otherwise claim
+   the highest-priority dependency-ready Bead;
+2. hydrate the task and acceptance criteria from that Bead;
 3. ask the Fugu MCP for persona/model assignments;
 4. launch `orchestrator:fugu-forum`;
 5. run queued research, implementation, verification, and judgment units;
@@ -89,16 +90,23 @@ bd ready --json
 bd show ISSUE --json
 ```
 
-Reference a specific item:
+Normal continuation requires no issue lookup:
 
 ```text
-/orchestrator:orchestrate bead=ISSUE Complete this Bead using its existing
-scope and acceptance criteria.
+/orchestrator:orchestrate continue
 ```
 
-Beads uses a single writer. Intake and final checkpoints are serialized. Native
-workflow state handles interruption between those checkpoints. `accept` closes
-the Bead; no-progress, rejection, or round exhaustion marks it blocked.
+Automatic intake considers `in_progress` items before dependency-ready open
+items. Within each group it sorts by priority, most recent update, and ID. It
+holds a per-Bead process lease, so another live Claude client skips that item
+and can claim the next eligible one. An explicit `bead=ISSUE` remains available
+as an override. When no in-progress or ready work remains, `continue` stops
+cleanly instead of creating a meaningless placeholder Bead.
+
+Beads uses a single writer. Intake and final checkpoints are serialized, and
+transient Dolt lock conflicts receive bounded retries. Native workflow state
+handles interruption between those checkpoints. `accept` closes the Bead;
+no-progress, rejection, or round exhaustion marks it blocked.
 
 ## Model Routing
 

@@ -59,9 +59,15 @@ history rather than an agent chat bus.
 
 ## Ready Queue Item
 
-Ask Claude Code to inspect `bd ready --json`, choose the intended issue, and
-invoke `/orchestrator:orchestrate bead=<id> ...`. Dependency ordering belongs to
-Beads. Parallel agent scheduling for the claimed issue belongs to `/workflows`.
+```text
+/orchestrator:orchestrate continue
+```
+
+The skill automatically resumes the highest-priority in-progress item or claims
+the highest-priority dependency-ready item. Priority ties use the most recent
+update and then the issue ID. A process lease makes another live client skip the
+same Bead. Dependency ordering belongs to Beads; parallel agent scheduling for
+the claimed item belongs to `/workflows`.
 
 ## Future Provider Adapter
 

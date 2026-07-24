@@ -19,19 +19,29 @@ Run the user's task in Claude Code's native workflow runtime. The task is:
 
 If the task is empty, ask for it. Otherwise:
 
-1. Derive explicit acceptance criteria from the request and repository. Do not
-   weaken criteria merely to get an accepting judgment.
+1. Extract acceptance criteria explicitly supplied by the user. For a generic
+   request such as `continue`, do not invent a new scope before reading Beads.
 2. Call `mcp__plugin_orchestrator_fugu__prepare_bead` with the absolute
-   workspace, exact task, acceptance criteria, and an explicit Bead ID when the
-   user supplied one. In a Beads workspace this atomically claims that issue or
-   creates a dedicated task. If Beads exists and preparation fails, stop rather
-   than running without durable project tracking. If `launch_allowed` is false,
-   do not create a duplicate run; direct the user to resume the existing native
-   workflow or explicitly reopen the Bead.
-3. Call `mcp__plugin_orchestrator_fugu__route_team` with the exact task and
+   workspace, exact user instruction, initial acceptance criteria, and an
+   explicit Bead ID only when the user supplied one. With no ID, intake is
+   automatic and deterministic: resume the highest-priority `in_progress`
+   item, otherwise claim the highest-priority dependency-ready item, breaking
+   ties by most recent update and then ID. The MCP holds a process lease so
+   another live client skips that Bead. It creates a dedicated Bead only when
+   no resumable or ready candidate exists.
+3. Read `resolved_task`, `resolved_acceptance_criteria`, `selection`, and the
+   selected `snapshot` from preparation. Use the resolved values from this
+   point forward; they hydrate a vague `continue` request with the Bead title,
+   description, design, notes, and acceptance contract. Add criteria required
+   by the repository only when they strengthen rather than replace the Bead's
+   contract. If Beads exists and preparation fails, stop rather than running
+   without durable tracking. If `launch_allowed` is false, do not create a
+   duplicate run; report the active candidate IDs and direct the user to the
+   existing native workflow.
+4. Call `mcp__plugin_orchestrator_fugu__route_team` with `resolved_task` and
    workflow `security-research-forum`. Do not hand-select models before seeing
    the route plan.
-4. Extract the returned `workflow_run_id` and `assignments`. Preserve each
+5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
    Set `quick` to `true` only when the user requests a quick workflow or the
    task needs independent evidence and judgment but not competing hypotheses,
@@ -41,17 +51,17 @@ If the task is empty, ask for it. Otherwise:
    set `ultracheck` to `true`; the workflow will require a clean-process rerun,
    broad project checks, at least five refutation hypotheses, and a claim-level
    evidence ledger.
-5. For security work, include the user's actual authorization and target
+6. For security work, include the user's actual authorization and target
    boundary. If no authorization is present, restrict execution to analysis of
    local artifacts and defensive engineering.
-6. Invoke the native `orchestrator:fugu-forum` workflow with structured args:
+7. Invoke the native `orchestrator:fugu-forum` workflow with structured args:
 
 ```json
 {
-  "task": "<exact user task>",
+  "task": "<resolved_task from prepare_bead>",
   "workspace": "<current absolute working directory>",
   "authorization": "<authorization and target boundary>",
-  "acceptanceCriteria": ["<criterion>", "<criterion>"],
+  "acceptanceCriteria": "<resolved_acceptance_criteria plus any strengthened repository criteria>",
   "assignments": "<assignments returned by route_team>",
   "workflowRunId": "<workflow_run_id returned by route_team>",
   "tracking": "<prepare_bead result when enabled, otherwise null>",
@@ -64,14 +74,18 @@ If the task is empty, ask for it. Otherwise:
 
 Use `maxRounds: 2` when `quick` is true. Use `maxRounds: 6` for the full forum.
 
-7. Tell the user the run is visible in `/workflows`. This is the only execution
+8. Tell the user the selected Bead and whether it was resumed, claimed, or
+   created. The run is visible in `/workflows`. This is the only execution
    plane; never launch an external scheduler.
-8. When the native workflow returns and Beads is enabled, call
+9. When the native workflow returns and Beads is enabled, call
    `mcp__plugin_orchestrator_fugu__checkpoint_bead` with its decision, summary,
    exact task, `workflowRunId`, `stopReason`, and queue. This write is
    serialized and also records idempotent per-route outcomes for Fugu. Close the
-   Bead only when the workflow's deterministic gate returned `accept`.
-9. Report the judgment, stop reason, queue totals, routed models, and real
+   Bead only when the workflow's deterministic gate returned `accept`. If
+   routing or workflow startup fails after preparation, checkpoint
+   `inconclusive` with stop reason `infrastructure-failure` and an empty queue;
+   this keeps the Bead in progress while releasing its live-client lease.
+10. Report the judgment, stop reason, queue totals, routed models, and real
    verification results. A blocked, rejected, no-progress, round-limited, or
    inconclusive result is not success.
 

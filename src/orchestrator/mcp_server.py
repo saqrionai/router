@@ -27,6 +27,7 @@ class FuguMcpServer:
     def __init__(self, config: AppConfig, store: StateStore):
         self.config = config
         self.store = store
+        self.beads = BeadsBridge()
 
     def handle(self, request: dict[str, Any]) -> dict[str, Any] | None:
         method = request.get("method")
@@ -41,7 +42,7 @@ class FuguMcpServer:
                     "capabilities": {"tools": {"listChanged": False}},
                     "serverInfo": {
                         "name": "orchestrator-fugu",
-                        "version": "0.1.0",
+                        "version": "0.2.0",
                     },
                 },
             )
@@ -102,9 +103,11 @@ class FuguMcpServer:
             {
                 "name": "prepare_bead",
                 "description": (
-                    "Claim an existing Bead or create one for a Claude native "
-                    "workflow. This records durable project state but never "
-                    "launches a model or scheduler."
+                    "Automatically resume the highest-priority in-progress Bead, "
+                    "otherwise claim the highest-priority dependency-ready Bead, "
+                    "or create one when no candidate exists. An explicit issue ID "
+                    "overrides selection. This records durable project state but "
+                    "never launches a model or scheduler."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -273,7 +276,7 @@ class FuguMcpServer:
             if not isinstance(raw_acceptance, list):
                 raise ValueError("acceptanceCriteria must be an array")
             issue_id = str(arguments.get("issue_id") or "").strip() or None
-            return BeadsBridge().prepare(
+            return self.beads.prepare(
                 workspace,
                 task,
                 [str(item) for item in raw_acceptance],
@@ -285,7 +288,7 @@ class FuguMcpServer:
                 isinstance(item, dict) for item in raw_queue
             ):
                 raise ValueError("queue must be an array of objects")
-            result = BeadsBridge().checkpoint(
+            result = self.beads.checkpoint(
                 Path(str(arguments.get("workspace") or "")).expanduser(),
                 str(arguments.get("issue_id") or ""),
                 decision=str(arguments.get("decision") or ""),
