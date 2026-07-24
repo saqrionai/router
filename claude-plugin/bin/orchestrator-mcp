@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+plugin_root="$(CDPATH= cd -- "${CLAUDE_PLUGIN_ROOT}" && pwd -P)"
+project_root="${ORCHESTRATOR_ROOT:-$(CDPATH= cd -- "${plugin_root}/.." && pwd -P)}"
+python="${project_root}/.venv/bin/python"
+if [ ! -x "${python}" ]; then
+  python="$(command -v python3)"
+fi
+
+export PYTHONPATH="${project_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${python}" -m orchestrator.mcp_server --root "${project_root}"

@@ -1,0 +1,47 @@
+{
+  "role_fit_weight": 1.0,
+  "preference_weight": 0.10,
+  "family_budget_bias": {
+    "anthropic": 0.18,
+    "openai": -0.12
+  },
+  "unique_model_bonus": 0.08,
+  "unique_family_bonus": 0.08,
+  "duplicate_model_penalty": 0.25,
+  "duplicate_family_penalty": 0.08,
+  "independence_model_penalty": 1.0,
+  "independence_family_penalty": 0.30,
+  "independence_pairs": [
+    ["researcher", "judge"],
+    ["bullshitter", "judge"],
+    ["exploiter", "judge"],
+    ["engineer", "verifier"],
+    ["engineer", "judge"],
+    ["verifier", "judge"]
+  ],
+  "task_signals": {
+    "reverse engineering": {"security_reasoning": 0.30, "context_endurance": 0.20},
+    "firmware": {"security_reasoning": 0.20, "code": 0.10},
+    "exploit": {"security_reasoning": 0.30, "creativity": 0.10},
+    "implement": {"code": 0.25, "tool_discipline": 0.15},
+    "debug": {"verification": 0.25, "skepticism": 0.15},
+    "research": {"research": 0.25, "context_endurance": 0.10},
+    "large context": {"context_endurance": 0.40},
+    "whole repository": {"context_endurance": 0.30, "research": 0.10}
+  },
+  "security_task_keywords": [
+    "security",
+    "reverse engineering",
+    "firmware",
+    "exploit",
+    "vulnerability",
+    "pentest",
+    "red team",
+    "malware",
+    "binary",
+    "memory corruption"
+  ],
+  "security_neutral_routes": {
+    "fable-5-bounded": ["researcher", "verifier", "judge"]
+  }
+}

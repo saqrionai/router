@@ -1,0 +1,13 @@
+{
+  "id": "security-research-forum",
+  "title": "Security Research Forum",
+  "description": "Routing roster for the Claude-native Fugu forum. This file selects eligible personas only; fugu-forum.js owns the execution graph.",
+  "requires_authorization": true,
+  "max_rounds": 6,
+  "stages": [
+    {
+      "id": "routable-personas",
+      "personas": ["researcher", "bullshitter", "exploiter", "engineer", "verifier", "judge"]
+    }
+  ]
+}

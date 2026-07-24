@@ -1,0 +1,27 @@
+{
+  "description": "Record Claude-native agent lifecycle and inject Fugu evidence and Fable routing constraints.",
+  "hooks": {
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

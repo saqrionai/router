@@ -1,0 +1,5 @@
+{
+  "fugu": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/orchestrator-mcp"
+  }
+}
