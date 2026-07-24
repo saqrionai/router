@@ -44,6 +44,12 @@ cannot recursively schedule agents.
 
 ## Start A Run
 
+The plugin is installed globally on this machine as
+`orchestrator@skills-dir`. New Claude Code sessions load it automatically.
+Existing first-party sessions can run `/reload-plugins`; sessions still showing
+an old LiteLLM mapping must be exited and resumed through `~/bin/claude` so they
+start with a clean first-party environment.
+
 Start Claude Code in the target repository with the native Opus model:
 
 ```sh

@@ -1,5 +1,40 @@
 # Operations
 
+## Install And Activate
+
+On this machine the Claude plugin is installed for every project through a live
+symlink:
+
+```text
+~/.claude/skills/orchestrator -> ~/Documents/orchestrator/claude-plugin
+```
+
+Confirm it with:
+
+```sh
+claude plugin details orchestrator@skills-dir
+```
+
+New Claude Code sessions load it automatically. In an existing first-party
+session, run `/reload-plugins` to load a new plugin version without discarding
+the conversation.
+
+Plugin reload does not replace process environment. A session whose status line
+still shows a LiteLLM model mapping must be exited and resumed through the
+first-party wrapper:
+
+```sh
+~/bin/claude --resume <session-id> --model opus
+```
+
+That wrapper removes inherited gateway, Bedrock, Vertex, and Foundry overrides
+before Claude starts. Do not launch `~/.local/bin/claude` directly.
+
+Codex can share Fugu routing policy and Beads tools through the
+`orchestrator-fugu` MCP server. It does not gain Claude's Workflow runtime and
+must not create a second forum scheduler. Restart or resume Codex after adding
+the MCP server because tool configuration is captured at session startup.
+
 ## Execution Plane
 
 Claude Code native dynamic workflows are the only scheduler. Keep the main
