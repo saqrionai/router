@@ -176,16 +176,48 @@ simultaneous writers.
     original task, the same ordered acceptance-criteria array, authorization,
     assignments,
     workflow run ID, security flag, validated plan, complete owner results,
-    review results, and integration result. It runs two independent audits in
-    parallel and an exact criterion-level judge. Accept only when that
-    workflow returns `status: accepted`.
-13. Checkpoint the Bead with
+    review results, integration result, and `revisionRound: 0`. It runs two
+    independent audits in parallel and an exact criterion-level judge. Accept
+    only when that workflow returns `status: accepted`.
+13. If the first final workflow returns `status: blocked`,
+    `stopReason: final-audit-failed`, and `remediationAllowed: true`, run
+    exactly one bounded remediation cycle:
+
+    - Require its `revisionPacket` to contain at least one failed criterion,
+      high/critical finding, failed check, integration blocker, judge blocker,
+      or next action. The packet is the remediation scope; do not add unrelated
+      improvements.
+    - Checkpoint the Bead immediately with decision `revise`, the first final
+      result, and the current queue. This preserves the rejected judgment
+      before more work starts.
+    - Launch `orchestrator:fugu-sweep` once with the original task and
+      acceptance criteria, current main checkout, same authorization and
+      assignments, `remediationRound: 1`, the exact `revisionPacket`,
+      `maxUnits: 16`, and the original integration checks. A malformed or
+      blocked remediation plan is terminal for this run.
+    - Materialize and execute only the remediation units through steps 8-11.
+      Preserve every accepted commit already on main. Owners must start from
+      the current post-integration HEAD; never replay or replace the initial
+      plan.
+    - Compare the resulting Git HEAD, accepted commit set, passed checks, and
+      criterion evidence with the state before remediation. If none changed,
+      stop with typed `no-progress`; do not spend the final rerun.
+    - Launch `orchestrator:fugu-sweep-final` one final time with
+      `revisionRound: 1` and the cumulative initial plus remediation evidence.
+      If it blocks, its typed stop is
+      `final-audit-failed-after-remediation`. Never plan a second remediation
+      cycle.
+
+    A first final result with `remediationAllowed: false`, an empty revision
+    packet, no progress, or a second rejection leaves the Bead in progress and
+    stops honestly. A worker merely returning does not count as remediation.
+14. Checkpoint the Bead with
    `mcp__plugin_orchestrator_fugu__checkpoint_bead`. Pass the exact decision,
    summary, task, workflow run ID, stop reason, and queue. Close only an
    independently accepted sweep. If startup fails, checkpoint
    `inconclusive` with `infrastructure-failure`.
-14. Report the planned unit count, wave count, model/persona routes, accepted and
-   blocked units, resulting Git HEAD, final checks, and judgment.
+15. Report the planned unit count, wave count, model/persona routes, accepted and
+    blocked units, resulting Git HEAD, final checks, and judgment.
 
 The skill is the native coordinator. Fugu routes persona/model pairs but never
 starts agents. The planner and final audit appear under `/workflows`; owner,

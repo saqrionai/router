@@ -41,7 +41,28 @@ const routeByPersona = Object.fromEntries(
 const tracking = input.tracking && typeof input.tracking === 'object'
   ? input.tracking
   : null
-const maxUnits = Math.max(1, Math.min(Number(input.maxUnits || 64), 64))
+const remediationRound = Number(input.remediationRound || 0)
+const revisionPacket = input.revisionPacket
+  && typeof input.revisionPacket === 'object'
+  && !Array.isArray(input.revisionPacket)
+  ? input.revisionPacket
+  : null
+if (
+  !Number.isInteger(remediationRound)
+  || remediationRound < 0
+  || remediationRound > 1
+  || (remediationRound === 1 && !revisionPacket)
+) {
+  return {
+    status: 'rejected',
+    reason: 'remediationRound must be 0, or 1 with a revisionPacket',
+  }
+}
+const unitLimit = remediationRound === 1 ? 16 : 64
+const maxUnits = Math.max(
+  1,
+  Math.min(Number(input.maxUnits || unitLimit), unitLimit),
+)
 const maxConcurrency = Math.max(
   1,
   Math.min(Number(input.maxConcurrency || 8), 12),
@@ -306,6 +327,14 @@ ${acceptance.length
   ? acceptance.map((item, index) => `${index + 1}. ${item}`).join('\n')
   : 'No explicit project acceptance was supplied; report this as a blocker.'}
 
+REMEDIATION ROUND:
+${remediationRound}
+
+REVISION PACKET:
+${revisionPacket
+  ? JSON.stringify(revisionPacket).slice(0, 18000)
+  : 'No revision packet. This is the initial project sweep.'}
+
 BEADS:
 ${tracking ? JSON.stringify(tracking).slice(0, 6000) : 'No Bead is attached.'}
 
@@ -323,6 +352,10 @@ Writing units need disjoint concurrent path scopes and real checks. Add a
 dependency whenever units overlap or consume another unit's result. Assign the
 best owner persona. Fable may own read-only neutral research but can never own
 a writing unit; every writing persona must have an Opus 5 or GPT-5.6 route.
+When REMEDIATION ROUND is 1, preserve all accepted work already on the current
+HEAD and emit units only for the failed criteria, high/critical findings,
+failed checks, integration blockers, judge blockers, and next actions in the
+revision packet. Do not re-plan accepted criteria or unrelated improvements.
 Return only one JSON object with this exact shape and no Markdown fence:
 {"status":"completed|blocked","summary":"...","baseSha":"git object id","repoClean":true,"units":[{"id":"lowercase-id","title":"...","objective":"...","kind":"research|implementation|test|artifact","writes":true,"risk":"low|medium|high|critical","resource":"light|medium|heavy","persona":"researcher|challenger|exploiter|engineer|verifier","paths":["relative/path/**"],"dependsOn":[],"acceptanceCriteria":["..."],"checks":["..."]}]}
 Do not emit persona-review units or units whose only
@@ -355,6 +388,8 @@ if (planErrors.length) {
     maxUnits,
     maxConcurrency,
     integrationChecks,
+    remediationRound,
+    revisionPacket,
     plan,
     planErrors,
   }
@@ -387,6 +422,8 @@ return {
   maxUnits,
   maxConcurrency,
   integrationChecks,
+  remediationRound,
+  revisionPacket,
   plan: {
     ...plan,
     units,

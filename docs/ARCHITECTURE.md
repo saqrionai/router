@@ -73,6 +73,13 @@ The sweep topology is for broad projects:
 7. one project judge resolves the original acceptance criteria against the
    resulting main checkout.
 
+If that final gate blocks, it emits a deterministic revision packet containing
+only failed criteria, high/critical findings, failed checks, integration
+blockers, judge blockers, and next actions. The coordinator may run one
+16-unit remediation sweep from the current accepted HEAD, then rerun the final
+gate once. No changed Git/evidence state is `no-progress`; a second rejection
+is `final-audit-failed-after-remediation`. Neither condition can recurse.
+
 Queue capacity and active concurrency are separate. The default queue can hold
 64 units while weighted active capacity is 8. Fugu selects a persona/model
 route for each unit role; it does not decide dependency readiness. When GPT is

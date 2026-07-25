@@ -31,7 +31,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     integrator = INTEGRATOR.read_text(encoding="utf-8")
     bounded_planner = PLANNER.read_text(encoding="utf-8")
 
-    assert "Math.min(Number(input.maxUnits || 64), 64)" in planner
+    assert "Math.min(Number(input.maxUnits || unitLimit), unitLimit)" in planner
     assert "Math.min(Number(input.maxConcurrency || 8), 12)" in planner
     assert "const plannerModel = 'opus-5-bounded'" in planner
     assert "function ownerRoutes(unit, writingOrdinal)" in planner
@@ -320,5 +320,61 @@ def test_final_gate_requires_two_exact_audits_and_judge_acceptance() -> None:
     assert "integration did not complete" in source
     assert "judge did not accept" in source
     assert "unresolved critical or high finding" in source
-    assert "status: gateErrors.length ? 'blocked' : 'accepted'" in source
+    assert "status: blocked ? 'blocked' : 'accepted'" in source
     assert "Do not edit, commit, push" in source
+
+
+def test_final_gate_builds_a_bounded_deterministic_revision_packet() -> None:
+    source = FINAL.read_text(encoding="utf-8")
+    start = source.index("function uniqueStrings")
+    end = source.index("const evidencePacket", start)
+    helpers = source[start:end]
+    script = (
+        f"{helpers}\n"
+        "const criteria = ['criterion a', 'criterion b'];\n"
+        "const audits = [\n"
+        "  {criteria:[\n"
+        "    {status:'passed',evidence:['a-proof']},\n"
+        "    {status:'failed',evidence:['b-failure']},\n"
+        "  ],findings:[{severity:'high',finding:'real defect',"
+        "evidence:['src/a.c:10']}],checks:[{name:'tests',status:'failed',"
+        "evidence:'exit 1'}]},\n"
+        "  {criteria:[\n"
+        "    {status:'passed',evidence:['a-proof-2']},\n"
+        "    {status:'passed',evidence:['b-proof-2']},\n"
+        "  ],findings:[],checks:[]},\n"
+        "];\n"
+        "const judge = {criteria:[\n"
+        "  {status:'passed',evidence:['a-judge']},\n"
+        "  {status:'failed',evidence:['b-judge']},\n"
+        "],blockers:['fix b','fix b'],nextActions:['rerun b']};\n"
+        "const packet = buildRevisionPacket(criteria,audits,judge,"
+        "{status:'completed'});\n"
+        "if (packet.failedCriteria.length !== 1) process.exit(1);\n"
+        "if (packet.failedCriteria[0].criterion !== 'criterion b') process.exit(1);\n"
+        "if (packet.findings.length !== 1) process.exit(1);\n"
+        "if (packet.failedChecks.length !== 1) process.exit(1);\n"
+        "if (JSON.stringify(packet.judgeBlockers) !== "
+        "JSON.stringify(['fix b'])) process.exit(1);\n"
+        "if (JSON.stringify(packet.nextActions) !== "
+        "JSON.stringify(['rerun b'])) process.exit(1);\n"
+    )
+
+    run_node(script)
+
+
+def test_sweep_allows_exactly_one_bounded_remediation_cycle() -> None:
+    planner = SWEEP.read_text(encoding="utf-8")
+    final = FINAL.read_text(encoding="utf-8")
+    skill = SWEEP_SKILL.read_text(encoding="utf-8")
+
+    assert "remediationRound > 1" in planner
+    assert "const unitLimit = remediationRound === 1 ? 16 : 64" in planner
+    assert "Do not re-plan accepted criteria or unrelated improvements." in planner
+    assert "revisionRound > 1" in final
+    assert "remediationAllowed: blocked && revisionRound === 0" in final
+    assert "final-audit-failed-after-remediation" in final
+    assert "exactly one bounded remediation cycle" in skill
+    assert "`maxUnits: 16`" in skill
+    assert "stop with typed `no-progress`" in skill
+    assert "Never plan a second remediation" in skill

@@ -21,6 +21,7 @@ if (args && typeof args === 'object') {
 const task = String(input.task || '').trim()
 const workspace = String(input.workspace || '').trim()
 const workflowRunId = String(input.workflowRunId || '').trim()
+const revisionRound = Number(input.revisionRound || 0)
 const acceptance = Array.isArray(input.acceptanceCriteria)
   ? input.acceptanceCriteria.map(String).map(item => item.trim()).filter(Boolean)
   : []
@@ -28,6 +29,12 @@ if (!task || !workspace || !workflowRunId || !acceptance.length) {
   return {
     status: 'rejected',
     reason: 'fugu-sweep-final requires task, workspace, workflowRunId, and acceptanceCriteria',
+  }
+}
+if (!Number.isInteger(revisionRound) || revisionRound < 0 || revisionRound > 1) {
+  return {
+    status: 'rejected',
+    reason: 'fugu-sweep-final revisionRound must be 0 or 1',
   }
 }
 
@@ -187,6 +194,92 @@ function criterionErrors(rows, source) {
     }
   })
   return errors
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set(
+    values.map(value => String(value || '').trim()).filter(Boolean),
+  ))
+}
+
+function buildRevisionPacket(criteria, auditResults, judge, integration) {
+  const failedCriteria = []
+  criteria.forEach((criterion, index) => {
+    const sources = []
+    auditResults.forEach((result, auditIndex) => {
+      const row = Array.isArray(result?.criteria)
+        ? result.criteria[index]
+        : null
+      sources.push({
+        source: `audit-${auditIndex + 1}`,
+        status: String(row?.status || 'missing'),
+        evidence: uniqueStrings(Array.isArray(row?.evidence) ? row.evidence : []),
+      })
+    })
+    const judgeRow = Array.isArray(judge?.criteria)
+      ? judge.criteria[index]
+      : null
+    sources.push({
+      source: 'judge',
+      status: String(judgeRow?.status || 'missing'),
+      evidence: uniqueStrings(
+        Array.isArray(judgeRow?.evidence) ? judgeRow.evidence : [],
+      ),
+    })
+    if (sources.some(source => (
+      source.status !== 'passed' || !source.evidence.length
+    ))) {
+      failedCriteria.push({ index, criterion, sources })
+    }
+  })
+
+  const findings = []
+  const failedChecks = []
+  auditResults.forEach((result, auditIndex) => {
+    for (const item of result?.findings || []) {
+      if (!['critical', 'high'].includes(item.severity)) continue
+      findings.push({
+        source: `audit-${auditIndex + 1}`,
+        severity: String(item.severity),
+        finding: String(item.finding || '').trim(),
+        evidence: uniqueStrings(
+          Array.isArray(item.evidence) ? item.evidence : [],
+        ),
+      })
+    }
+    for (const item of result?.checks || []) {
+      if (!['failed', 'errored'].includes(item.status)) continue
+      failedChecks.push({
+        source: `audit-${auditIndex + 1}`,
+        name: String(item.name || '').trim(),
+        status: String(item.status),
+        evidence: String(item.evidence || '').trim(),
+      })
+    }
+  })
+
+  const integrationBlockers = []
+  if (!['completed', 'accepted'].includes(integration?.status)) {
+    integrationBlockers.push(...uniqueStrings([
+      integration?.summary,
+      integration?.reason,
+      integration?.stopReason,
+      ...(Array.isArray(integration?.unresolved) ? integration.unresolved : []),
+    ]))
+  }
+
+  return {
+    failedCriteria,
+    findings,
+    failedChecks,
+    integrationBlockers,
+    judgeBlockers: uniqueStrings(
+      Array.isArray(judge?.blockers) ? judge.blockers : [],
+    ),
+    nextActions: uniqueStrings(
+      Array.isArray(judge?.nextActions) ? judge.nextActions : [],
+    ),
+  }
 }
 
 const evidencePacket = {
@@ -357,10 +450,24 @@ if (!judgment || judgment.decision !== 'accept') {
   if ((judgment.blockers || []).length) gateErrors.push('judge reported blockers')
 }
 
+const blocked = gateErrors.length > 0
+const revisionPacket = blocked
+  ? buildRevisionPacket(acceptance, audits, judgment, integrationResult)
+  : null
+
 return {
   workflowRunId,
-  status: gateErrors.length ? 'blocked' : 'accepted',
-  stopReason: gateErrors.length ? 'final-audit-failed' : 'accepted',
+  status: blocked ? 'blocked' : 'accepted',
+  stopReason: blocked
+    ? (
+      revisionRound === 0
+        ? 'final-audit-failed'
+        : 'final-audit-failed-after-remediation'
+    )
+    : 'accepted',
+  revisionRound,
+  remediationAllowed: blocked && revisionRound === 0,
+  revisionPacket,
   audits,
   judgment,
   gateErrors: Array.from(new Set(gateErrors)),
