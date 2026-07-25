@@ -94,6 +94,7 @@ class BeadsBridgeTests(unittest.TestCase):
         self.assertNotIn("private_field", snapshot)
         self.assertEqual(run.call_args.kwargs["cwd"], Path("/tmp/project"))
 
+    @patch.dict(os.environ, {"ORCHESTRATOR_BD_BIN": ""})
     @patch("orchestrator.beads.subprocess.run")
     def test_comment_is_append_only(self, run) -> None:
         run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
