@@ -58,7 +58,12 @@ Claude's journal and `/workflows` remain authoritative during reasoning periods
 that emit no hook event. Native control is still available: `/workflows` can
 stop or restart a selected agent and pause or resume the run. The workflow
 JavaScript API does not currently expose a per-agent cancellation handle to an
-automatic watchdog while `await agent()` is in flight.
+automatic watchdog while `await agent()` is in flight. A live Claude Code
+2.1.220 probe confirmed that `continue: false` from a workflow subagent's
+`PreToolUse` hook stops only that agent, not a parallel peer. The runtime
+reports that stopped call as a fulfilled empty result, however, so Orchestrator
+keeps native runtime control authoritative and treats any empty structured
+result as invalid rather than as successful work.
 
 Logical model ids remain separate from transport:
 

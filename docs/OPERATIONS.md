@@ -120,9 +120,17 @@ show the last native lifecycle or tool event. Claude's own journal and
 `/workflows` remain authoritative for long reasoning calls that do not emit a
 tool event. The native runtime supports manual per-agent stop and restart, but
 workflow JavaScript does not expose an asynchronous cancellation handle that a
-plugin watchdog can call while `await agent()` is in flight. Hook-level
-`continue: false` is not used as a substitute because tool hook payloads do not
-guarantee a target agent id and could stop more than the intended worker.
+plugin watchdog can call while `await agent()` is in flight.
+
+A disposable two-agent probe on Claude Code 2.1.220 established the narrower
+hook behavior: a `PreToolUse` hook returning `continue: false` stopped only the
+triggering workflow agent while its in-flight peer completed normally.
+`PreToolUse` included the workflow `agent_id`. The stopped call was nevertheless
+reported to workflow JavaScript as a fulfilled empty result instead of a typed
+cancellation. Orchestrator therefore does not use hook cancellation as its
+primary native control surface. Its structured-result gate rejects the empty
+result and may fall back safely; operators should use `/workflows` or
+`TaskStop` when they need an immediate, explicitly represented native stop.
 
 ## Beads Queue
 
