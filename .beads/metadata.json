@@ -1,7 +1,7 @@
 {
   "database": "dolt",
   "backend": "dolt",
-  "dolt_mode": "embedded",
+  "dolt_mode": "server",
   "dolt_database": "orch",
   "project_id": "de794267-b52e-4cd4-8eb5-1a113b473d59"
 }
