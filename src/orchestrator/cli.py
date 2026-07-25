@@ -290,6 +290,18 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{'bd':10} ok {bd_binary} ({version})")
         else:
             print(f"{'bd':10} missing")
+        claude_settings = Path.home() / ".claude" / "settings.json"
+        try:
+            settings_payload = json.loads(
+                claude_settings.read_text(encoding="utf-8")
+            )
+        except (FileNotFoundError, json.JSONDecodeError):
+            settings_payload = {}
+        worktree_base = str(
+            (settings_payload.get("worktree") or {}).get("baseRef") or "fresh"
+        )
+        state = "ok" if worktree_base == "head" else "warning"
+        print(f"worktrees: {state} baseRef={worktree_base}")
         profile_warnings = config.profile_source_warnings()
         if profile_warnings:
             print(f"profiles:  warning ({len(profile_warnings)})")

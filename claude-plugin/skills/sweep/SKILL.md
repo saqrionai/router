@@ -89,6 +89,13 @@ simultaneous writers.
    be 64, but never launch 64 simultaneous builds. For each writing unit, make
    a **direct top-level native `Agent` call** with `isolation: worktree`:
 
+   Before launching the first writer, require the effective Claude Code setting
+   `worktree.baseRef` to be `"head"`. Claude's default `"fresh"` branches
+   isolated subagents from `origin/HEAD`, which omits unpushed integrated or
+   remediation commits. If the setting is not `"head"`, checkpoint an
+   infrastructure failure and stop before any writer launch. The per-worker
+   exact base-SHA preflight remains mandatory even when the setting is correct.
+
    - GPT-5.6 owner route: `orchestrator:sweep-codex-worker`;
    - Opus 5 owner route: `orchestrator:sweep-opus-worker`;
    - Fable is never a writing owner and never handles operational security;
@@ -194,7 +201,15 @@ simultaneous writers.
       acceptance criteria, current main checkout, same authorization and
       assignments, `remediationRound: 1`, the exact `revisionPacket`,
       `maxUnits: 16`, and the original integration checks. A malformed or
-      blocked remediation plan is terminal for this run.
+      blocked remediation plan is terminal for this run. Pass
+      `revisionPacket` inline as the JSON object returned by the final
+      workflow; a file path, attachment, artifact reference, or
+      `revisionPacketPath` field is invalid.
+    - The first remediation `Workflow` call consumes the single planning
+      attempt, including when input validation returns `status: rejected`
+      before an agent launches. Never correct arguments or retry that call in
+      the same run. Checkpoint the typed rejection and leave the Bead in
+      progress.
     - Materialize and execute only the remediation units through steps 8-11.
       Preserve every accepted commit already on main. Owners must start from
       the current post-integration HEAD; never replay or replace the initial

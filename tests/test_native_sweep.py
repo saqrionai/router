@@ -98,6 +98,8 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
         assert "read or write `.beads`" in normalized_worker
     assert "Beads is centralized coordinator state" in skill
     assert "restart Claude from the current main HEAD" in skill
+    assert '`worktree.baseRef` to be `"head"`' in skill
+    assert 'default `"fresh"` branches' in skill
     assert "':(exclude).claude/worktrees/**'" in integrator
     assert "Do not ignore any other `.claude` path" in integrator
 
@@ -367,6 +369,7 @@ def test_sweep_allows_exactly_one_bounded_remediation_cycle() -> None:
     planner = SWEEP.read_text(encoding="utf-8")
     final = FINAL.read_text(encoding="utf-8")
     skill = SWEEP_SKILL.read_text(encoding="utf-8")
+    normalized_skill = " ".join(skill.split())
 
     assert "remediationRound > 1" in planner
     assert "const unitLimit = remediationRound === 1 ? 16 : 64" in planner
@@ -376,5 +379,11 @@ def test_sweep_allows_exactly_one_bounded_remediation_cycle() -> None:
     assert "final-audit-failed-after-remediation" in final
     assert "exactly one bounded remediation cycle" in skill
     assert "`maxUnits: 16`" in skill
+    assert "Pass `revisionPacket` inline as the JSON object" in normalized_skill
+    assert (
+        "including when input validation returns `status: rejected`"
+        in normalized_skill
+    )
+    assert "Never correct arguments or retry that call" in normalized_skill
     assert "stop with typed `no-progress`" in skill
     assert "Never plan a second remediation" in skill

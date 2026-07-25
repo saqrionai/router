@@ -92,6 +92,10 @@ repository probe showed that direct Agent calls honor `isolation: worktree`,
 while agents spawned inside a dynamic workflow ignore custom-agent isolation
 and explicit `cwd`. Writer agents therefore fail closed unless their current
 Git directory is a linked worktree distinct from the main checkout.
+Claude Code must use `worktree.baseRef: "head"`; its default `"fresh"` creates
+subagent worktrees from `origin/HEAD` and would omit unpushed sweep commits.
+`orch doctor` reports the configured base policy, and every writer still
+verifies its exact dispatched base SHA before model launch.
 Claude places active linked worktrees under `.claude/worktrees/`; integration
 cleanliness excludes exactly that runtime path and no other dirty state.
 
