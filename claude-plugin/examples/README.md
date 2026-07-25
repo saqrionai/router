@@ -12,10 +12,11 @@ its exact H1 with direct file evidence and independent criterion-level judgment.
 Do not edit files.
 ```
 
-Quick mode omits competing opening hypotheses and cross-examination. It still
-runs the routed researcher, one real artifact worker, an independent verifier,
-and the deterministic judge. Use it for bounded checks where the full forum
-would add cost without materially improving the answer.
+Quick mode runs two independent opening agents in parallel, one artifact writer
+after that evidence barrier, and two independent verification agents in
+parallel before deterministic judgment. It omits the separate
+cross-examination phase. Use it for bounded checks where the full forum would
+add cost without materially improving the answer.
 
 ## Mixed Anthropic And OpenAI
 

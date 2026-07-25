@@ -48,10 +48,10 @@ If the task is empty, ask for it. Otherwise:
    route plan.
 5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
-   Set `quick` to `true` only when the user requests a quick workflow or the
-   task needs independent evidence and judgment but not competing hypotheses,
-   adversarial cross-examination, or broad coverage. Quick mode still runs a
-   real researcher, implementation worker, verifier, and judge.
+   Set `quick` to `true` only when the user explicitly requests a quick
+   workflow. Otherwise use the full forum; do not silently reduce the graph
+   based on an inferred task size. Quick mode still runs parallel opening and
+   verification units around one artifact writer and one judge.
    If the task contains the exact word `ultracheck`, preserve it in `task` and
    set `ultracheck` to `true`; the workflow will require a clean-process rerun,
    broad project checks, at least five refutation hypotheses, and a claim-level

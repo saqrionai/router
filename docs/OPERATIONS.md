@@ -98,10 +98,11 @@ budget. Recovery agents use at most three substantive tool calls, may retry a
 no-signal machine check only once, and must keep a shell command's combined
 declared worst-case runtime below 90 seconds. A second no-signal result ends
 testing and returns a blocked or partial result instead of consuming another
-verification loop. For bounded tasks, ask for a `quick workflow`; it runs
-evidence, artifact, verification, and judgment units while omitting the
-competing hypothesis and cross-examination phases and defaults to two rounds.
-Use the full forum for ambiguous, adversarial, or broad work.
+verification loop. For bounded tasks, ask for a `quick workflow`; it fans out
+two independent opening units, runs one artifact writer after that barrier,
+fans out two independent verification units, and then judges. It omits the
+separate cross-examination phase and defaults to two rounds. Use the full forum
+for ambiguous, adversarial, or broad work.
 
 Process-backed model agents use
 `claude-plugin/bin/agent-supervisor`. It launches one durable process, records

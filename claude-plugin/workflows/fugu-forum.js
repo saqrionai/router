@@ -1116,27 +1116,20 @@ claim. Progress booleans compare this round with the prior round.`, {
 }
 
 phase('Opening posts')
-const opening = quick
-  ? [await dispatch(
+const opening = await parallel([
+  () => dispatch(
     'researcher',
     'Build the evidence inventory before conclusions harden.',
     null,
     'Opening posts',
-  )]
-  : await parallel([
-    () => dispatch(
-      'researcher',
-      'Build the evidence inventory before conclusions harden.',
-      null,
-      'Opening posts',
-    ),
-    () => dispatch(
-      'bullshitter',
-      'Produce competing explanations and falsification tests without treating them as facts.',
-      null,
-      'Opening posts',
-    ),
-  ])
+  ),
+  () => dispatch(
+    'bullshitter',
+    'Independently challenge the likely conclusions and identify evidence gaps or cheaper falsification tests without treating hypotheses as facts.',
+    null,
+    'Opening posts',
+  ),
+])
 
 phase('Cross-examination')
 const cross = quick
@@ -1167,33 +1160,24 @@ let artifact = await dispatch(
 
 async function verifyAndJudge(round, artifactValue) {
   phase('Verification')
-  const verification = quick
-    ? [await dispatch(
+  const verification = await parallel([
+    () => dispatch(
       'verifier',
       'Independently inspect the artifact and attempt to falsify every material completion claim.',
       { opening, cross, artifact: artifactValue },
       'Verification',
       `-artifact-r${round}`,
       round,
-    )]
-    : await parallel([
-      () => dispatch(
-        'verifier',
-        'Independently inspect the artifact and attempt to falsify every material completion claim.',
-        { opening, cross, artifact: artifactValue },
-        'Verification',
-        `-artifact-r${round}`,
-        round,
-      ),
-      () => dispatch(
-        'researcher',
-        'Check whether the artifact and citations cover the original evidence base without omissions or drift.',
-        { opening, cross, artifact: artifactValue },
-        'Verification',
-        `-coverage-r${round}`,
-        round,
-      ),
-    ])
+    ),
+    () => dispatch(
+      'researcher',
+      'Check whether the artifact and citations cover the original evidence base without omissions or drift.',
+      { opening, cross, artifact: artifactValue },
+      'Verification',
+      `-coverage-r${round}`,
+      round,
+    ),
+  ])
   const refutation = ultracheck
     ? await dispatch(
       'verifier',
