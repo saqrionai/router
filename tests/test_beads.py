@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -102,4 +103,25 @@ class BeadsBridgeTests(unittest.TestCase):
         self.assertEqual(
             run.call_args.args[0],
             ["bd", "comments", "add", "ios-123", "run summary"],
+        )
+
+    @patch.dict(
+        os.environ,
+        {"ORCHESTRATOR_BD_BIN": "/opt/homebrew/bin/bd"},
+    )
+    @patch("orchestrator.beads.subprocess.run")
+    def test_configured_bd_binary_replaces_path_lookup(self, run) -> None:
+        run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        BeadsBridge().comment(Path("/tmp/project"), "ios-123", "run summary")
+
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "/opt/homebrew/bin/bd",
+                "comments",
+                "add",
+                "ios-123",
+                "run summary",
+            ],
         )

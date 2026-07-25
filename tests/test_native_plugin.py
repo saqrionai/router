@@ -11,6 +11,7 @@ OPUS_48_AGENT = ROOT / "claude-plugin" / "agents" / "opus-48-recovery.md"
 ORCHESTRATE_SKILL = (
     ROOT / "claude-plugin" / "skills" / "orchestrate" / "SKILL.md"
 )
+MCP_LAUNCHER = ROOT / "claude-plugin" / "bin" / "orchestrator-mcp"
 
 
 def test_workflow_modes_have_bounded_graph_and_queue_evidence() -> None:
@@ -57,6 +58,15 @@ def test_orchestrate_skill_defaults_to_automatic_bead_intake() -> None:
     assert "another live client skips that Bead" in source
     assert "`standard`: the default" in source
     assert "Full mode additionally runs parallel cross-examination" in source
+
+
+def test_mcp_launcher_pins_current_beads_without_overriding_operator() -> None:
+    source = MCP_LAUNCHER.read_text(encoding="utf-8")
+
+    assert '[ -z "${ORCHESTRATOR_BD_BIN:-}" ]' in source
+    assert "command -v brew" in source
+    assert 'ORCHESTRATOR_BD_BIN="${brew_bd}"' in source
+    assert "export ORCHESTRATOR_BD_BIN" in source
 
 
 def test_opus_48_is_a_quality_gated_native_recovery_route() -> None:

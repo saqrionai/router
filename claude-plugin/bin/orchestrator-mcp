@@ -8,5 +8,16 @@ if [ ! -x "${python}" ]; then
   python="$(command -v python3)"
 fi
 
+# Long-lived clients can inherit an older user-local bd before Homebrew's
+# current binary. Pin one executable for the MCP process while preserving an
+# explicit operator override and the normal PATH fallback on non-Homebrew hosts.
+if [ -z "${ORCHESTRATOR_BD_BIN:-}" ] && command -v brew >/dev/null 2>&1; then
+  brew_bd="$(brew --prefix)/bin/bd"
+  if [ -x "${brew_bd}" ]; then
+    ORCHESTRATOR_BD_BIN="${brew_bd}"
+    export ORCHESTRATOR_BD_BIN
+  fi
+fi
+
 export PYTHONPATH="${project_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
 exec "${python}" -m orchestrator.mcp_server --root "${project_root}"

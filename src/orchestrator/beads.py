@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 import re
 import subprocess
 import time
@@ -502,10 +503,14 @@ class BeadsBridge:
     def _run(
         workspace: Path, argv: list[str]
     ) -> subprocess.CompletedProcess[str]:
+        command = list(argv)
+        configured_bd = os.environ.get("ORCHESTRATOR_BD_BIN", "").strip()
+        if command and command[0] == "bd" and configured_bd:
+            command[0] = configured_bd
         for attempt in range(5):
             try:
                 completed = subprocess.run(
-                    argv,
+                    command,
                     cwd=workspace,
                     text=True,
                     capture_output=True,
@@ -526,5 +531,5 @@ class BeadsBridge:
             if lock_conflict and attempt < 4:
                 time.sleep(0.1 * (2**attempt))
                 continue
-            raise BeadsError(f"{' '.join(argv[:3])} failed: {detail}")
-        raise BeadsError(f"{' '.join(argv[:3])} failed after retries")
+            raise BeadsError(f"{' '.join(command[:3])} failed: {detail}")
+        raise BeadsError(f"{' '.join(command[:3])} failed after retries")
