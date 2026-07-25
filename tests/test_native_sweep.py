@@ -42,6 +42,9 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "semantically distinct units" in planner
     assert "Deduplicate units" in planner
     assert "every writes=false unit MUST return paths=[]" in planner
+    assert "Every unit id MUST be lowercase" in planner
+    assert "Every writing path MUST be relative to the" in planner
+    assert "pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'" in planner
     assert "await parallel([" in final
     assert "READ-ONLY FINAL SWEEP AUDIT" in final
     assert "criterionErrors" in final

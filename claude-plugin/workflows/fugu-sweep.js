@@ -91,7 +91,10 @@ const planSchema = {
           'checks',
         ],
         properties: {
-          id: { type: 'string' },
+          id: {
+            type: 'string',
+            pattern: '^[a-z0-9][a-z0-9._-]{0,63}$',
+          },
           title: { type: 'string' },
           objective: { type: 'string' },
           kind: {
@@ -117,7 +120,13 @@ const planSchema = {
               'verifier',
             ],
           },
-          paths: { type: 'array', items: { type: 'string' } },
+          paths: {
+            type: 'array',
+            items: {
+              type: 'string',
+              pattern: '^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$)).+',
+            },
+          },
           dependsOn: { type: 'array', items: { type: 'string' } },
           acceptanceCriteria: {
             type: 'array',
@@ -355,10 +364,14 @@ that would produce the same artifact or test the same claim. Set writes=true
 only when the unit changes files. The paths field is exclusive write ownership,
 not a list of files inspected: every writes=false unit MUST return paths=[] and
 may name inspected files in its objective, criteria, and checks instead.
+Every unit id MUST be lowercase and match
+^[a-z0-9][a-z0-9._-]{0,63}$. Every writing path MUST be relative to the
+workspace: never emit an absolute path, .git path, or parent traversal.
 Writing units need disjoint concurrent path scopes and real checks. Add a
 dependency whenever units overlap or consume another unit's result. Assign the
-best owner persona. Do not emit persona-review units or units whose only purpose
-is to rerun project-wide integration checks; the parent runs these after merge:
+best owner persona. Do not emit persona-review units or units whose only
+purpose is to rerun project-wide integration checks; the parent runs these
+after merge:
 ${integrationChecks.length
   ? integrationChecks.join('\n')
   : 'No extra integration checks were supplied.'}
