@@ -27,6 +27,7 @@ class ConfigTests(unittest.TestCase):
             {
                 "opus-5[1m]",
                 "opus-5-bounded",
+                "opus-4.8-bounded",
                 "fable-5[1m]",
                 "fable-5-bounded",
                 "gpt-5.6-sol",
@@ -44,31 +45,46 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.models["gpt-5.6-sol"].family, "openai")
         self.assertEqual(config.models["gpt-5.6-sol"].context_window, 1_050_000)
         self.assertEqual(config.models["opus-5-bounded"].context_window, 1_000_000)
+        self.assertTrue(config.models["opus-4.8-bounded"].fallback_only)
+        self.assertEqual(
+            config.models["opus-4.8-bounded"].model,
+            "claude-opus-4-8",
+        )
         self.assertEqual(
             config.personas["exploiter"].preferred_models,
-            ("opus-5-bounded", "gpt-5.6-high"),
+            ("opus-5-bounded", "gpt-5.6-high", "opus-4.8-bounded"),
         )
         self.assertEqual(
             config.personas["bullshitter"].preferred_models,
-            ("opus-5-bounded", "gpt-5.6-research"),
+            ("opus-5-bounded", "gpt-5.6-research", "opus-4.8-bounded"),
         )
         self.assertEqual(
             config.personas["engineer"].preferred_models,
-            ("opus-5-bounded", "gpt-5.6-high"),
+            ("opus-5-bounded", "gpt-5.6-high", "opus-4.8-bounded"),
         )
         self.assertEqual(
             config.personas["verifier"].preferred_models,
-            ("fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol"),
+            (
+                "fable-5-bounded",
+                "opus-5-bounded",
+                "gpt-5.6-sol",
+                "opus-4.8-bounded",
+            ),
         )
         self.assertEqual(
             config.personas["judge"].preferred_models,
-            ("fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol"),
+            (
+                "fable-5-bounded",
+                "opus-5-bounded",
+                "gpt-5.6-sol",
+                "opus-4.8-bounded",
+            ),
         )
         self.assertGreater(config.models["gpt-5.6-sol"].traits["verification"], 0.0)
         self.assertGreater(config.personas["judge"].trait_weights["skepticism"], 0.0)
         self.assertEqual(
             config.team_policy.security_neutral_routes["fable-5-bounded"],
-            ("researcher", "verifier", "judge"),
+            (),
         )
         self.assertIn("exploit", config.team_policy.security_task_keywords)
         workflow = config.workflow("security-research-forum")
@@ -85,6 +101,9 @@ class ConfigTests(unittest.TestCase):
                 "judge",
             ),
         )
+        general = config.workflow("general-forum")
+        self.assertFalse(general.requires_authorization)
+        self.assertIn("exploiter", general.stages[0].personas)
 
 
 if __name__ == "__main__":

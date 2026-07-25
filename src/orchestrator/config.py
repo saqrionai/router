@@ -55,6 +55,7 @@ class AppConfig:
                 backend=item["backend"],
                 model=item.get("model", item["id"]),
                 context_window=int(item["context_window"]),
+                fallback_only=bool(item.get("fallback_only", False)),
                 strengths=tuple(item.get("strengths") or ()),
                 family=str(item.get("family") or "unknown"),
                 styles=tuple(item.get("styles") or ()),
@@ -171,6 +172,13 @@ class AppConfig:
             if missing:
                 raise ValueError(
                     f"persona {persona.id!r} references unknown models: {missing}"
+                )
+            if not any(
+                not self.models[model].fallback_only
+                for model in persona.preferred_models
+            ):
+                raise ValueError(
+                    f"persona {persona.id!r} has no primary-capable model"
                 )
             if not persona.trait_weights:
                 raise ValueError(f"persona {persona.id!r} has no trait weights")

@@ -161,9 +161,10 @@ def main(argv: list[str] | None = None) -> None:
                 )
     elif args.command == "models":
         for route in config.models.values():
+            mode = "recovery" if route.fallback_only else "primary"
             print(
                 f"{route.id:20} {route.backend:12} {route.context_window:>9,}  "
-                f"{route.family:10} {', '.join(route.styles)}"
+                f"{route.family:10} {mode:8} {', '.join(route.styles)}"
             )
     elif args.command == "personas":
         for persona in config.personas.values():
@@ -221,6 +222,16 @@ def main(argv: list[str] | None = None) -> None:
         if args.persona not in config.personas:
             raise SystemExit(f"unknown persona: {args.persona}")
         model_ids = tuple(args.models or config.personas[args.persona].preferred_models)
+        primary_model_ids = tuple(
+            model_id
+            for model_id in model_ids
+            if not config.models[model_id].fallback_only
+        )
+        recovery_model_ids = tuple(
+            model_id
+            for model_id in model_ids
+            if config.models[model_id].fallback_only
+        )
         candidates = FuguRouter(
             models=config.models,
             personas=config.personas,
@@ -230,12 +241,13 @@ def main(argv: list[str] | None = None) -> None:
         ).rank(
             task=args.task,
             persona_id=args.persona,
-            model_ids=model_ids,
+            model_ids=primary_model_ids,
         )
         payload = {
             "persona": args.persona,
             "task": args.task,
             "routes": [candidate.as_dict() for candidate in candidates],
+            "recovery_routes": list(recovery_model_ids),
         }
         if args.json:
             print(json.dumps(payload, indent=2))
@@ -250,6 +262,8 @@ def main(argv: list[str] | None = None) -> None:
                     f"{candidate.contextual_observations} "
                     f"format={candidate.format_success:0.3f} calls={candidate.calls}"
                 )
+            if recovery_model_ids:
+                print(f"recovery-only: {', '.join(recovery_model_ids)}")
     elif args.command == "doctor":
         print(f"config: ok ({len(config.models)} models, {len(config.personas)} personas)")
         print(f"state:  ok ({store.path})")

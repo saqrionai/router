@@ -23,3 +23,6 @@ The model column shows the current composed default, not a hard binding. Trait
 weights and candidates live in `config/personas.json`; model priors live in
 `config/models.json`; team constraints live in `config/team-policy.json`.
 Changing any of them does not rewrite the workflow or historical messages.
+For security-classified tasks, policy removes Fable from every persona before
+composition; the verifier then defaults to Opus 5, with Opus 4.8 available only
+as a quality-gated recovery route.

@@ -351,12 +351,58 @@ class BeadsBridge:
                     if str(item.get("status"))
                     in {"returned", "verified", "accepted"}
                 )
+                recovery_attempts = []
+                for item in queue:
+                    unit_id = str(item.get("id") or "unknown-unit")
+                    attempts = item.get("routeAttempts")
+                    if not isinstance(attempts, list):
+                        continue
+                    for attempt in attempts:
+                        if not isinstance(attempt, dict):
+                            continue
+                        outcome = str(attempt.get("outcome") or "")
+                        model = str(attempt.get("model") or "unknown-model")
+                        reasons = attempt.get("reasons")
+                        rendered_reasons = (
+                            "; ".join(str(reason) for reason in reasons)
+                            if isinstance(reasons, list)
+                            else "no reason recorded"
+                        )
+                        recovery_attempts.append(
+                            (
+                                unit_id,
+                                outcome,
+                                f"- {unit_id} via {model}: {outcome} - "
+                                f"{rendered_reasons[:500]}"
+                            )
+                        )
+                fallback_units = {
+                    unit_id
+                    for unit_id, _, _ in recovery_attempts
+                    if sum(
+                        1
+                        for candidate_id, _, _ in recovery_attempts
+                        if candidate_id == unit_id
+                    ) > 1
+                }
+                rendered_attempts = [
+                    line
+                    for unit_id, outcome, line in recovery_attempts
+                    if unit_id in fallback_units or outcome != "usable"
+                ]
+                quality_history = (
+                    "\n- Recovery attempts:\n"
+                    + "\n".join(rendered_attempts[:20])
+                    if rendered_attempts
+                    else "\n- Recovery attempts: none"
+                )
                 comment = (
                     "Claude native workflow checkpoint\n\n"
                     f"- Decision: {decision}\n"
                     f"- Stop reason: {stop_reason or 'none'}\n"
                     f"- Queue: {completed_units}/{len(queue)} units returned or verified\n"
                     f"- Summary: {summary.strip()[:8_000] or 'No summary returned.'}"
+                    f"{quality_history}"
                 )
                 self.comment(workspace, issue_id, comment)
                 if decision == "accept":
@@ -387,6 +433,18 @@ class BeadsBridge:
         finally:
             self._release_issue_lease(beads_root, issue_id)
         return {"enabled": True, "issue_id": issue_id, "status": status}
+
+    def validate_checkpoint_target(
+        self,
+        workspace: Path,
+        issue_id: str,
+    ) -> None:
+        """Fail before persistence when the Beads checkpoint target is invalid."""
+        self._validate_issue_id(issue_id)
+        workspace = workspace.expanduser().resolve()
+        if self._beads_root(workspace) is None:
+            raise BeadsError(f"no .beads directory under {workspace}")
+        self.snapshot(workspace, issue_id)
 
     def snapshot(self, workspace: Path, issue_id: str) -> dict[str, Any]:
         self._validate_issue_id(issue_id)

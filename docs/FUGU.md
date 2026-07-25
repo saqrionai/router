@@ -41,10 +41,16 @@ Measured outcomes can override that prior.
 
 ## Security Routing
 
-Fable 5 is neutral-only for cybersecurity work. It may research supplied
-evidence, verify artifacts, or judge claims. It cannot be selected as the
-hypothesis generator, exploit analyst, or implementation engineer. The native
-agent prompt enforces the same boundary after routing.
+Fable 5 is used only for neutral, non-security work. Native canary testing
+showed that supplied cybersecurity context caused a provider fallback to Opus
+5 even under a neutral reviewer contract, which breaks route attribution. For
+security tasks Fable cannot be selected for any persona. The native agent
+prompt remains a defense-in-depth boundary if a stale route reaches it.
+An authorization-required workflow is security-classified by construction; it
+does not depend on the user repeating words such as `security` or
+`vulnerability` in every task.
+The separate `general-forum` is the native path for clearly non-security work
+and keeps Fable eligible for neutral verification and judgment.
 
 Only routes in `config/models.json` are active. The current set is Opus 5,
 Fable 5, and GPT-5.6 variants. A future provider is added as one bounded native

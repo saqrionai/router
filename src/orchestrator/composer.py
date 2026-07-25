@@ -33,12 +33,16 @@ class TeamComposer:
     def compose(self, workflow: Workflow, task: str = "") -> TeamPlan:
         persona_ids = self._workflow_personas(workflow)
         task_traits = self._task_traits(task)
+        eligibility_task = (
+            f"security {task}" if workflow.requires_authorization else task
+        )
         candidates = [
             tuple(
                 model_id
                 for model_id in self.personas[persona_id].preferred_models
+                if not self.models[model_id].fallback_only
                 if is_route_eligible(
-                    task=task,
+                    task=eligibility_task,
                     persona_id=persona_id,
                     model_id=model_id,
                     policy=self.policy,
@@ -74,7 +78,12 @@ class TeamComposer:
             raise ValueError(f"workflow {workflow.id!r} has no model candidates")
 
         assignments = tuple(
-            self._assignment(persona_id, model_id, task, task_traits)
+            self._assignment(
+                persona_id,
+                model_id,
+                eligibility_task,
+                task_traits,
+            )
             for persona_id, model_id in zip(persona_ids, best_models, strict=True)
         )
         families = {self.models[model_id].family for model_id in best_models}
@@ -124,9 +133,14 @@ class TeamComposer:
                 weight * self._effective_trait(model, trait)
                 for trait, weight in task_traits.items()
             ) / sum(task_traits.values())
-        rank = persona.preferred_models.index(model.id)
-        preference = (len(persona.preferred_models) - rank) / len(
-            persona.preferred_models
+        primary_preferences = tuple(
+            model_id
+            for model_id in persona.preferred_models
+            if not self.models[model_id].fallback_only
+        )
+        rank = primary_preferences.index(model.id)
+        preference = (len(primary_preferences) - rank) / len(
+            primary_preferences
         )
         behavioral_fit = 0.7 * trait_fit + 0.2 * required_fit + 0.1 * task_fit
         return (
@@ -210,7 +224,7 @@ class TeamComposer:
         route_adjustment = self.route_adjustments.get((persona_id, model_id), 0.0)
         if route_adjustment:
             reasons.append(f"learned-route={route_adjustment:+.3f}")
-        fallback_order = (model_id,) + tuple(
+        eligible_fallbacks = tuple(
             candidate
             for candidate in persona.preferred_models
             if candidate != model_id
@@ -219,6 +233,19 @@ class TeamComposer:
                 persona_id=persona_id,
                 model_id=candidate,
                 policy=self.policy,
+            )
+        )
+        fallback_order = (
+            (model_id,)
+            + tuple(
+                candidate
+                for candidate in eligible_fallbacks
+                if self.models[candidate].fallback_only
+            )
+            + tuple(
+                candidate
+                for candidate in eligible_fallbacks
+                if not self.models[candidate].fallback_only
             )
         )
         return TeamAssignment(

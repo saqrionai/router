@@ -483,7 +483,15 @@ class StateStore:
                 SELECT persona,
                        model,
                        COUNT(*) AS calls,
-                       SUM(CASE WHEN status != 'blocked' THEN 1 ELSE 0 END)
+                       SUM(
+                           CASE
+                               WHEN status IN (
+                                   'accepted', 'verified', 'returned', 'blocked'
+                               )
+                               THEN 1
+                               ELSE 0
+                           END
+                       )
                            AS format_successes,
                        COUNT(*) AS terminal_calls,
                        SUM(
@@ -594,12 +602,12 @@ class StateStore:
         queue: list[dict[str, Any]],
     ) -> int:
         """Persist idempotent per-unit outcomes from one native workflow."""
-        if not workflow_run_id.strip():
-            raise ValueError("workflow_run_id must be non-empty")
-        if not task.strip():
-            raise ValueError("native outcome task must be non-empty")
-        if decision not in {"accept", "revise", "reject", "inconclusive"}:
-            raise ValueError(f"invalid native outcome decision: {decision}")
+        self.validate_native_outcome(
+            workflow_run_id=workflow_run_id,
+            task=task,
+            decision=decision,
+            queue=queue,
+        )
         rows: list[tuple[Any, ...]] = []
         for item in queue:
             unit_id = str(item.get("id") or "").strip()
@@ -608,29 +616,70 @@ class StateStore:
             status = str(item.get("status") or "").strip()
             if not unit_id or not persona or not model:
                 continue
-            if status not in {"accepted", "verified", "returned", "blocked"}:
-                continue
-            reward = {
-                "accepted": 1.0,
-                "verified": 0.5,
-                "returned": 0.5,
-                "blocked": 0.0,
-            }[status]
-            rows.append(
-                (
-                    workflow_run_id,
-                    unit_id,
-                    bead_id,
-                    task,
-                    int(item.get("round") or 1),
-                    persona,
-                    model,
-                    status,
-                    decision,
-                    reward,
-                    _now(),
-                )
+            attempts = item.get("routeAttempts")
+            has_explicit_attempts = (
+                isinstance(attempts, list)
+                and bool(attempts)
+                and all(isinstance(attempt, dict) for attempt in attempts)
             )
+            normalized_attempts = (
+                attempts
+                if has_explicit_attempts
+                else []
+            )
+            if not normalized_attempts:
+                normalized_attempts = [{"model": model, "outcome": "usable"}]
+            for attempt_index, attempt in enumerate(normalized_attempts, start=1):
+                attempt_model = str(attempt.get("model") or "").strip()
+                outcome = str(attempt.get("outcome") or "").strip()
+                if not attempt_model or outcome not in {
+                    "usable",
+                    "degraded",
+                    "invalid",
+                    "unavailable",
+                }:
+                    continue
+                observation_status = status if outcome == "usable" else outcome
+                if observation_status not in {
+                    "accepted",
+                    "verified",
+                    "returned",
+                    "blocked",
+                    "degraded",
+                    "invalid",
+                    "unavailable",
+                }:
+                    continue
+                reward = (
+                    {
+                        "accepted": 1.0,
+                        "verified": 0.5,
+                        "returned": 0.5,
+                        "blocked": 0.0,
+                    }[observation_status]
+                    if outcome == "usable"
+                    else 0.0
+                )
+                observation_unit_id = (
+                    f"{unit_id}:attempt:{attempt_index}"
+                    if has_explicit_attempts
+                    else unit_id
+                )
+                rows.append(
+                    (
+                        workflow_run_id,
+                        observation_unit_id,
+                        bead_id,
+                        task,
+                        int(item.get("round") or 1),
+                        persona,
+                        attempt_model,
+                        observation_status,
+                        decision,
+                        reward,
+                        _now(),
+                    )
+                )
         with self.connect() as connection:
             before = connection.total_changes
             connection.executemany(
@@ -643,6 +692,32 @@ class StateStore:
                 rows,
             )
             return connection.total_changes - before
+
+    @staticmethod
+    def validate_native_outcome(
+        *,
+        workflow_run_id: str,
+        task: str,
+        decision: str,
+        queue: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Validate a native checkpoint before either durable system mutates."""
+        if not workflow_run_id.strip():
+            raise ValueError("workflow_run_id must be non-empty")
+        if not task.strip():
+            raise ValueError("native outcome task must be non-empty")
+        if decision not in {"accept", "revise", "reject", "inconclusive"}:
+            raise ValueError(f"invalid native outcome decision: {decision}")
+        for item in queue or []:
+            raw_round = item.get("round") or 1
+            try:
+                round_number = int(raw_round)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"native outcome round must be an integer: {raw_round!r}"
+                ) from exc
+            if round_number < 1:
+                raise ValueError("native outcome round must be positive")
 
     def save_check_result(
         self,

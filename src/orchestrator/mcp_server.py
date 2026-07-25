@@ -12,6 +12,7 @@ from orchestrator.cli import default_state_path
 from orchestrator.composer import TeamComposer
 from orchestrator.config import AppConfig
 from orchestrator.fugu_router import FuguRouter
+from orchestrator.eligibility import is_route_eligible
 from orchestrator.store import StateStore
 
 
@@ -171,6 +172,9 @@ class FuguMcpServer:
                 arguments.get("workflow") or "security-research-forum"
             ).strip()
             workflow = self.config.workflow(workflow_id)
+            eligibility_task = (
+                f"security {task}" if workflow.requires_authorization else task
+            )
             persona_ids = tuple(
                 dict.fromkeys(
                     persona
@@ -189,10 +193,15 @@ class FuguMcpServer:
             route_adjustments: dict[tuple[str, str], float] = {}
             for persona_id in persona_ids:
                 persona = self.config.personas[persona_id]
+                primary_models = tuple(
+                    model_id
+                    for model_id in persona.preferred_models
+                    if not self.config.models[model_id].fallback_only
+                )
                 candidates = router.rank(
-                    task=task,
+                    task=eligibility_task,
                     persona_id=persona_id,
-                    model_ids=persona.preferred_models,
+                    model_ids=primary_models,
                 )
                 distributions[persona_id] = [
                     candidate.as_dict() for candidate in candidates
@@ -248,6 +257,22 @@ class FuguMcpServer:
             if persona_id not in self.config.personas:
                 raise ValueError(f"unknown persona: {persona_id}")
             persona = self.config.personas[persona_id]
+            primary_models = tuple(
+                model_id
+                for model_id in persona.preferred_models
+                if not self.config.models[model_id].fallback_only
+            )
+            recovery_models = tuple(
+                model_id
+                for model_id in persona.preferred_models
+                if self.config.models[model_id].fallback_only
+                and is_route_eligible(
+                    task=task,
+                    persona_id=persona_id,
+                    model_id=model_id,
+                    policy=self.config.team_policy,
+                )
+            )
             router = FuguRouter(
                 models=self.config.models,
                 personas=self.config.personas,
@@ -263,9 +288,10 @@ class FuguMcpServer:
                     for candidate in router.rank(
                         task=task,
                         persona_id=persona_id,
-                        model_ids=persona.preferred_models,
+                        model_ids=primary_models,
                     )
                 ],
+                "recovery_routes": list(recovery_models),
             }
         if name == "prepare_bead":
             workspace = Path(str(arguments.get("workspace") or "")).expanduser()
@@ -288,23 +314,36 @@ class FuguMcpServer:
                 isinstance(item, dict) for item in raw_queue
             ):
                 raise ValueError("queue must be an array of objects")
+            workspace = Path(
+                str(arguments.get("workspace") or "")
+            ).expanduser()
+            issue_id = str(arguments.get("issue_id") or "")
+            workflow_run_id = str(arguments.get("workflow_run_id") or "")
+            task = str(arguments.get("task") or "")
+            decision = str(arguments.get("decision") or "")
+            self.store.validate_native_outcome(
+                workflow_run_id=workflow_run_id,
+                task=task,
+                decision=decision,
+                queue=raw_queue,
+            )
+            self.beads.validate_checkpoint_target(workspace, issue_id)
             result = self.beads.checkpoint(
-                Path(str(arguments.get("workspace") or "")).expanduser(),
-                str(arguments.get("issue_id") or ""),
-                decision=str(arguments.get("decision") or ""),
+                workspace,
+                issue_id,
+                decision=decision,
                 summary=str(arguments.get("summary") or ""),
                 stop_reason=str(arguments.get("stop_reason") or ""),
                 queue=raw_queue,
             )
-            result["routing_observations_recorded"] = (
-                self.store.record_native_outcome(
-                    workflow_run_id=str(arguments.get("workflow_run_id") or ""),
-                    bead_id=str(arguments.get("issue_id") or ""),
-                    task=str(arguments.get("task") or ""),
-                    decision=str(arguments.get("decision") or ""),
-                    queue=raw_queue,
-                )
+            recorded = self.store.record_native_outcome(
+                workflow_run_id=workflow_run_id,
+                bead_id=issue_id,
+                task=task,
+                decision=decision,
+                queue=raw_queue,
             )
+            result["routing_observations_recorded"] = recorded
             return result
         raise ValueError(f"unknown tool: {name}")
 

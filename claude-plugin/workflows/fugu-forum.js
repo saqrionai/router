@@ -324,6 +324,8 @@ function enqueue(persona, phaseName, objective, round) {
     status: 'queued',
     model: null,
     attemptedModels: [],
+    routeAttempts: [],
+    degradationReasons: [],
   }
   queue.push(item)
   return item
@@ -343,6 +345,8 @@ function queueSnapshot() {
     status: item.status,
     model: item.model,
     attemptedModels: item.attemptedModels,
+    routeAttempts: item.routeAttempts,
+    degradationReasons: item.degradationReasons,
     workerStatus: item.workerStatus || null,
     summary: item.summary || null,
     reason: item.reason || null,
@@ -352,6 +356,7 @@ function queueSnapshot() {
 function agentTypeForModel(model) {
   if (model.startsWith('fable-5')) return 'orchestrator:fable-neutral'
   if (model.startsWith('gpt-5.6')) return 'orchestrator:codex-worker'
+  if (model.startsWith('opus-4.8')) return 'orchestrator:opus-48-recovery'
   return 'orchestrator:opus-worker'
 }
 
@@ -364,7 +369,7 @@ function routes(persona) {
       ? selected.fallback_order.map(String)
       : []),
   ]
-  return Array.from(new Set(models)).slice(0, 3).map((model, index) => ({
+  return Array.from(new Set(models)).slice(0, 4).map((model, index) => ({
     model,
     agentType: index === 0 && selected.agent_type
       ? String(selected.agent_type)
@@ -385,6 +390,27 @@ function validWorkerResult(result) {
       && typeof result === 'object'
       && ['completed', 'blocked'].includes(result.status)
       && typeof result.summary === 'string'
+      && Array.isArray(result.claims)
+      && Array.isArray(result.evidence)
+      && Array.isArray(result.checks)
+      && Array.isArray(result.unresolved)
+      && Array.isArray(result.nextActions),
+  )
+}
+
+function validUltraResult(result) {
+  return Boolean(
+    result
+      && typeof result === 'object'
+      && ['completed', 'blocked'].includes(result.status)
+      && typeof result.summary === 'string'
+      && Array.isArray(result.broadChecks)
+      && result.cleanRerun
+      && typeof result.cleanRerun === 'object'
+      && Array.isArray(result.hypotheses)
+      && Array.isArray(result.hostileInputs)
+      && Array.isArray(result.evidenceLedger)
+      && Array.isArray(result.unresolved)
       && Array.isArray(result.nextActions),
   )
 }
@@ -402,6 +428,267 @@ function validJudgeResult(result) {
       && result.progress
       && typeof result.progress === 'object',
   )
+}
+
+function workerDegradationReasons(result, persona) {
+  const reasons = []
+  const summary = String(result.summary || '').trim()
+  const claims = Array.isArray(result.claims) ? result.claims : []
+  const evidence = Array.isArray(result.evidence) ? result.evidence : []
+  const checks = Array.isArray(result.checks) ? result.checks : []
+  const unresolved = Array.isArray(result.unresolved) ? result.unresolved : []
+  const nextActions = Array.isArray(result.nextActions) ? result.nextActions : []
+
+  if (!summary) reasons.push('empty summary')
+  if (
+    result.status === 'completed'
+    && claims.length === 0
+    && evidence.length === 0
+    && checks.length === 0
+  ) {
+    reasons.push('completed result contains no claims, evidence, or checks')
+  }
+  if (
+    result.status === 'blocked'
+    && unresolved.length === 0
+    && nextActions.length === 0
+  ) {
+    reasons.push('blocked result gives no unresolved issue or next action')
+  }
+  if (
+    result.status === 'completed'
+    && persona === 'researcher'
+    && evidence.length === 0
+  ) {
+    reasons.push('researcher completed without an evidence inventory')
+  }
+  if (
+    result.status === 'completed'
+    && ['bullshitter', 'exploiter'].includes(persona)
+    && claims.length === 0
+  ) {
+    reasons.push(`${persona} completed without claims or hypotheses`)
+  }
+  if (
+    result.status === 'completed'
+    && persona === 'engineer'
+    && claims.length === 0
+    && checks.length === 0
+  ) {
+    reasons.push('engineer completed without an artifact claim or check')
+  }
+  if (
+    result.status === 'completed'
+    && persona === 'verifier'
+    && evidence.length === 0
+    && checks.length === 0
+  ) {
+    reasons.push('verifier completed without evidence or machine checks')
+  }
+
+  const evidenceIds = evidence.map(item => String(item.id || '').trim())
+  if (evidenceIds.some(id => !id)) {
+    reasons.push('evidence contains an empty identifier')
+  }
+  if (new Set(evidenceIds).size !== evidenceIds.length) {
+    reasons.push('evidence identifiers are not unique')
+  }
+  if (evidence.some(item => (
+    !String(item.source || '').trim()
+    || !String(item.observation || '').trim()
+  ))) {
+    reasons.push('evidence contains an empty source or observation')
+  }
+  if (claims.some(item => (
+    item.status === 'supported'
+    && (
+      !Array.isArray(item.evidenceIds)
+      || item.evidenceIds.length === 0
+      || item.evidenceIds.some(id => (
+        !String(id || '').trim()
+        || !evidenceIds.includes(String(id).trim())
+      ))
+    )
+  ))) {
+    reasons.push('a supported claim has blank or dangling evidence identifiers')
+  }
+  if (checks.some(item => (
+    item.status === 'passed' && !String(item.evidence || '').trim()
+  ))) {
+    reasons.push('a passed check has no observed evidence')
+  }
+
+  return Array.from(new Set(reasons))
+}
+
+function judgeDegradationReasons(result) {
+  const reasons = []
+  const criteria = Array.isArray(result.criteria) ? result.criteria : []
+  const completionClaims = Array.isArray(result.completionClaims)
+    ? result.completionClaims
+    : []
+  const blockers = Array.isArray(result.blockers) ? result.blockers : []
+  const nextActions = Array.isArray(result.nextActions) ? result.nextActions : []
+
+  if (!String(result.summary || '').trim()) reasons.push('empty judge summary')
+  if (
+    acceptance.length
+    && (
+      criteria.length !== acceptance.length
+      || criteria.some((row, index) => (
+        String(row.criterion || '').trim() !== acceptance[index]
+      ))
+    )
+  ) {
+    reasons.push('judge did not return every exact acceptance criterion')
+  }
+  if (criteria.some(row => (
+    row.status === 'passed'
+    && (
+      !Array.isArray(row.evidence)
+      || row.evidence.length === 0
+      || row.evidence.some(item => !String(item || '').trim())
+    )
+  ))) {
+    reasons.push('a passed criterion has blank or missing evidence')
+  }
+  if (completionClaims.some(row => (
+    row.status === 'supported'
+    && (
+      !Array.isArray(row.evidence)
+      || row.evidence.length === 0
+      || row.evidence.some(item => !String(item || '').trim())
+    )
+  ))) {
+    reasons.push('a supported completion claim has blank or missing evidence')
+  }
+  if (
+    result.decision === 'accept'
+    && (
+      blockers.length > 0
+      || criteria.some(row => row.status !== 'passed')
+    )
+  ) {
+    reasons.push('accept decision contradicts blockers or criterion status')
+  }
+  if (
+    result.decision === 'revise'
+    && blockers.length === 0
+    && nextActions.length === 0
+  ) {
+    reasons.push('revise decision gives no blocker or next action')
+  }
+  return Array.from(new Set(reasons))
+}
+
+function ultraDegradationReasons(result) {
+  const reasons = []
+  if (!String(result.summary || '').trim()) {
+    reasons.push('empty UltraCheck summary')
+  }
+  if (
+    result.status === 'blocked'
+    && result.unresolved.length === 0
+    && result.nextActions.length === 0
+  ) {
+    reasons.push('blocked UltraCheck gives no unresolved issue or next action')
+  }
+  if (result.status === 'completed') {
+    const broadCategories = new Set(
+      result.broadChecks.map(item => item.category),
+    )
+    for (const category of ['acceptance', 'tests', 'build', 'typecheck', 'lint']) {
+      if (!broadCategories.has(category)) {
+        reasons.push(`UltraCheck omitted broad check category: ${category}`)
+      }
+    }
+    if (result.broadChecks.some(
+      item => !String(item.evidence || '').trim(),
+    )) {
+      reasons.push('UltraCheck broad check has no evidence')
+    }
+    if (
+      !result.cleanRerun.performed
+      || !String(result.cleanRerun.evidence || '').trim()
+    ) {
+      reasons.push('UltraCheck clean-process rerun is missing evidence')
+    }
+    if (result.hypotheses.length < 5) {
+      reasons.push('UltraCheck contains fewer than five refutation hypotheses')
+    }
+    if (result.hypotheses.some(item => (
+      !String(item.hypothesis || '').trim()
+      || !String(item.test || '').trim()
+      || !String(item.evidence || '').trim()
+    ))) {
+      reasons.push('UltraCheck hypothesis is incomplete or lacks evidence')
+    }
+    const hostileCategories = new Set(
+      result.hostileInputs.map(item => item.category),
+    )
+    for (const category of [
+      'empty',
+      'null',
+      'zero',
+      'negative',
+      'huge',
+      'malformed',
+      'unicode',
+      'duplicate',
+      'error-path',
+      'boundary',
+    ]) {
+      if (!hostileCategories.has(category)) {
+        reasons.push(`UltraCheck omitted hostile input category: ${category}`)
+      }
+    }
+    if (result.hostileInputs.some(
+      item => !String(item.evidence || '').trim(),
+    )) {
+      reasons.push('UltraCheck hostile-input result has no evidence')
+    }
+    if (
+      result.evidenceLedger.length === 0
+      || result.evidenceLedger.some(item => (
+        !String(item.claim || '').trim()
+        || !Array.isArray(item.evidence)
+        || item.evidence.length === 0
+        || item.evidence.some(value => !String(value || '').trim())
+      ))
+    ) {
+      reasons.push('UltraCheck claim-level evidence ledger is incomplete')
+    }
+  }
+  return Array.from(new Set(reasons))
+}
+
+function isAbortError(error) {
+  const name = error && typeof error === 'object' && 'name' in error
+    ? String(error.name)
+    : ''
+  const code = error && typeof error === 'object' && 'code' in error
+    ? String(error.code)
+    : ''
+  const message = error && typeof error === 'object' && 'message' in error
+    ? String(error.message)
+    : String(error)
+  return /abort|cancel|WorkflowAgentCapError|WorkflowBudgetExceededError/i.test(name)
+    || /abort|cancel/i.test(code)
+    || /\b(user cancel|workflow (?:abort|cancel|stop)|workflow agent\(\) call cap reached|workflow token budget exceeded|budget (?:limits?|exhaust(?:ed|ion)?|exceed(?:ed|s)?)|turn (?:cap|limit))\b/i.test(message)
+}
+
+function agentFailureReason(error) {
+  const rendered = error && typeof error === 'object' && 'message' in error
+    ? String(error.message)
+    : String(error)
+  return `agent call failed: ${rendered.slice(0, 500)}`
+}
+
+function providerFailureReason(result) {
+  if (!result || result.status !== 'failed') return ''
+  return String(result.summary || 'worker reported provider failure')
+    .trim()
+    .slice(0, 500)
 }
 
 async function dispatch(
@@ -454,20 +741,80 @@ ${excerpt(evidence || 'No prior phase evidence.')}
 
 Return the requested structured result. A successful tool exit is evidence only;
 it does not establish task completion. Never invent a command, output, source,
-artifact, or evidence identifier.`
-    const result = await agent(prompt, {
-      label: `${persona}${suffix}${attempt ? `-fallback${attempt}` : ''}`,
-      phase: phaseName,
-      agentType: selected.agentType,
-      schema,
-    })
-    if (validWorkerResult(result)) {
+artifact, or evidence identifier. Include every evidence identifier cited by a
+supported claim in this result's own evidence inventory.`
+    let result = null
+    try {
+      result = await agent(prompt, {
+        label: `${persona}${suffix}${attempt ? `-fallback${attempt}` : ''}`,
+        phase: phaseName,
+        agentType: selected.agentType,
+        schema,
+      })
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      const reason = agentFailureReason(error)
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'unavailable',
+        reasons: [reason],
+      })
+      log(
+        `${queueItem.id}: ${selected.model} unavailable: ${reason}; `
+        + 'trying declared fallback',
+      )
+      continue
+    }
+    const providerFailure = providerFailureReason(result)
+    if (providerFailure) {
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'unavailable',
+        reasons: [providerFailure],
+      })
+      log(
+        `${queueItem.id}: ${selected.model} reported provider failure: `
+        + `${providerFailure}; trying declared fallback`,
+      )
+      continue
+    }
+    const isUltraResult = schema === ultraSchema
+    const validResult = isUltraResult
+      ? validUltraResult(result)
+      : validWorkerResult(result)
+    if (validResult) {
+      const degradationReasons = isUltraResult
+        ? ultraDegradationReasons(result)
+        : workerDegradationReasons(result, persona)
+      if (degradationReasons.length) {
+        queueItem.routeAttempts.push({
+          model: selected.model,
+          outcome: 'degraded',
+          reasons: degradationReasons,
+        })
+        queueItem.degradationReasons.push(...degradationReasons)
+        log(
+          `${queueItem.id}: ${selected.model} response degraded: `
+          + `${degradationReasons.join('; ')}; trying declared fallback`,
+        )
+        continue
+      }
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'usable',
+        reasons: [],
+      })
       updateQueue(queueItem, result.status === 'blocked' ? 'blocked' : 'returned', {
         summary: result.summary,
         workerStatus: result.status,
       })
       return result
     }
+    queueItem.routeAttempts.push({
+      model: selected.model,
+      outcome: 'invalid',
+      reasons: ['missing or invalid structured result'],
+    })
     log(
       `${queueItem.id}: ${selected.model} returned no valid result; trying declared fallback`,
     )
@@ -653,7 +1000,9 @@ async function judgeRound(round, evidence) {
     queueItem.model = selected.model
     queueItem.attemptedModels.push(selected.model)
     updateQueue(queueItem, 'running')
-    const candidate = await agent(`PERSONA: judge
+    let candidate = null
+    try {
+      candidate = await agent(`PERSONA: judge
 ROUTED MODEL: ${selected.model}
 ROUTE ATTEMPT: ${attempt + 1}/${attempts.length}
 WORKSPACE: ${workspace}
@@ -683,10 +1032,61 @@ claim. Progress booleans compare this round with the prior round.`, {
       phase: 'Judgment',
       agentType: selected.agentType,
       schema: judgeSchema,
-    })
+      })
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      const reason = agentFailureReason(error)
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'unavailable',
+        reasons: [reason],
+      })
+      log(
+        `${queueItem.id}: ${selected.model} unavailable: ${reason}; `
+        + 'trying declared fallback',
+      )
+      continue
+    }
+    const providerFailure = providerFailureReason(candidate)
+    if (providerFailure) {
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'unavailable',
+        reasons: [providerFailure],
+      })
+      log(
+        `${queueItem.id}: ${selected.model} judge provider failure: `
+        + `${providerFailure}; trying declared fallback`,
+      )
+      continue
+    }
     if (validJudgeResult(candidate)) {
-      raw = candidate
+      const degradationReasons = judgeDegradationReasons(candidate)
+      if (degradationReasons.length) {
+        queueItem.routeAttempts.push({
+          model: selected.model,
+          outcome: 'degraded',
+          reasons: degradationReasons,
+        })
+        queueItem.degradationReasons.push(...degradationReasons)
+        log(
+          `${queueItem.id}: ${selected.model} judgment degraded: `
+          + `${degradationReasons.join('; ')}; trying declared fallback`,
+        )
+      } else {
+        queueItem.routeAttempts.push({
+          model: selected.model,
+          outcome: 'usable',
+          reasons: [],
+        })
+        raw = candidate
+      }
     } else {
+      queueItem.routeAttempts.push({
+        model: selected.model,
+        outcome: 'invalid',
+        reasons: ['missing or invalid structured judgment'],
+      })
       log(
         `${queueItem.id}: ${selected.model} returned an invalid judgment; trying fallback`,
       )
@@ -747,7 +1147,7 @@ const cross = quick
 phase('Artifact workshop')
 let artifact = await dispatch(
   'engineer',
-  'Use the strongest surviving claims to implement or construct the requested artifact, then run the relevant checks.',
+  'Use the strongest surviving claims to implement or construct the requested artifact. Do not repeat expensive checks already established by direct opening evidence; run only the smallest missing or artifact-specific check. The verification phase owns independent re-runs.',
   { opening, cross },
   'Artifact workshop',
 )

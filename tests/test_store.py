@@ -116,10 +116,61 @@ class StoreTests(unittest.TestCase):
             self.assertEqual(outcomes["gpt-5.6-high"]["accepted_calls"], 1)
             self.assertEqual(
                 outcomes["fable-5-bounded"]["format_successes"],
-                0,
+                1,
             )
             observations = {
                 row["model"]: row for row in store.routing_observations()
             }
             self.assertEqual(observations["gpt-5.6-high"]["reward"], 1.0)
             self.assertEqual(observations["fable-5-bounded"]["reward"], 0.0)
+
+    def test_native_recovery_attempts_train_degraded_primary_as_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateStore(Path(directory) / "state.db")
+            queue = [
+                {
+                    "id": "unit-1",
+                    "round": 1,
+                    "persona": "verifier",
+                    "model": "opus-4.8-bounded",
+                    "status": "accepted",
+                    "routeAttempts": [
+                        {
+                            "model": "fable-5-bounded",
+                            "outcome": "degraded",
+                            "reasons": ["passed criterion has no evidence"],
+                        },
+                        {
+                            "model": "opus-4.8-bounded",
+                            "outcome": "usable",
+                            "reasons": [],
+                        },
+                    ],
+                }
+            ]
+
+            recorded = store.record_native_outcome(
+                workflow_run_id="native-recovery",
+                bead_id="orch-test",
+                task="Verify the parser.",
+                decision="accept",
+                queue=queue,
+            )
+
+            self.assertEqual(recorded, 2)
+            outcomes = {
+                row["model"]: row for row in store.routing_outcomes()
+            }
+            self.assertEqual(
+                outcomes["fable-5-bounded"]["format_successes"],
+                0,
+            )
+            self.assertEqual(
+                outcomes["opus-4.8-bounded"]["accepted_calls"],
+                1,
+            )
+            observations = {
+                row["model"]: row for row in store.routing_observations()
+            }
+            self.assertEqual(observations["fable-5-bounded"]["reward"], 0.0)
+            self.assertEqual(observations["opus-4.8-bounded"]["reward"], 1.0)

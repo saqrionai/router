@@ -34,14 +34,16 @@ checks, a clean-process rerun, refutation hypotheses, hostile-input categories,
 and a claim-level evidence ledger.
 
 Each queue unit records persona, logical route, native agent type, attempted
-fallbacks, status, round, and summary. Worker return is testimony. Only the
-deterministic judge gate can accept the task.
+fallbacks, per-attempt quality outcomes and reasons, status, round, and summary.
+Worker return is testimony. Only the deterministic judge gate can accept the
+task.
 
 ## Model Adapters
 
-Opus 5 and Fable 5 run as native Claude agents. A GPT-5.6 assignment runs a
-native `codex-worker` adapter. That adapter invokes `codex-subagent` exactly
-once, returns the real structured result, and cannot recursively orchestrate.
+Opus 5, Fable 5, and the recovery-only Opus 4.8 route run as native Claude
+agents. A GPT-5.6 assignment runs a native `codex-worker` adapter. That adapter
+invokes `codex-subagent` exactly once, returns the real structured result, and
+cannot recursively orchestrate.
 
 Logical model ids remain separate from transport:
 
@@ -96,6 +98,8 @@ inspection. They cannot execute work and are not a second control plane.
 
 The workflow carries the user's authorization and target boundary to every
 worker. Without authorization, execution is restricted to local read-only
-analysis and defensive engineering. Fable remains neutral-only for security
-tasks. Provider safeguards and usage policies still apply independently of
-routing.
+analysis and defensive engineering. Fable is excluded from security tasks
+because native fallback to Opus would make model attribution unreliable.
+Authorization-required workflows enforce that exclusion even when the short
+task text contains no configured security keyword.
+Provider safeguards and usage policies still apply independently of routing.

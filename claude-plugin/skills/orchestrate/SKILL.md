@@ -8,7 +8,7 @@ allowed-tools:
   - mcp__plugin_orchestrator_fugu__route_team
   - mcp__plugin_orchestrator_fugu__prepare_bead
   - mcp__plugin_orchestrator_fugu__checkpoint_bead
-  - Agent(orchestrator:opus-worker, orchestrator:fable-neutral, orchestrator:codex-worker)
+  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker)
 ---
 
 # Orchestrator
@@ -38,9 +38,14 @@ If the task is empty, ask for it. Otherwise:
    without durable tracking. If `launch_allowed` is false, do not create a
    duplicate run; report the active candidate IDs and direct the user to the
    existing native workflow.
-4. Call `mcp__plugin_orchestrator_fugu__route_team` with `resolved_task` and
-   workflow `security-research-forum`. Do not hand-select models before seeing
-   the route plan.
+4. Select the routing profile, then call
+   `mcp__plugin_orchestrator_fugu__route_team` with `resolved_task` and that
+   workflow. Use `security-research-forum` whenever the task or hydrated Bead
+   involves security, vulnerability research, reverse engineering, firmware,
+   exploitation, binary analysis, memory safety, fuzzing, CVEs, crash analysis,
+   or any authorization-required target. Use `general-forum` only when the
+   work is clearly non-security. Do not hand-select models before seeing the
+   route plan.
 5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
    Set `quick` to `true` only when the user requests a quick workflow or the

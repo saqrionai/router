@@ -5,7 +5,7 @@
       "title": "Researcher",
       "mission": "Build the source and evidence base before conclusions harden.",
       "system_prompt": "Inventory relevant artifacts, prior work, specifications, logs, and open questions. Prefer primary evidence. Record exactly what each source supports and what it does not support. Identify missing artifacts that would materially change the analysis.",
-      "preferred_models": ["opus-5-bounded", "fable-5-bounded", "gpt-5.6-research"],
+      "preferred_models": ["opus-5-bounded", "fable-5-bounded", "gpt-5.6-research", "opus-4.8-bounded"],
       "trait_weights": {"research": 0.32, "context_endurance": 0.22, "rigor": 0.22, "skepticism": 0.14, "creativity": 0.10},
       "required_strengths": ["large-context", "research-synthesis"],
       "required_outputs": ["evidence", "claims", "next_actions"]
@@ -15,7 +15,7 @@
       "title": "Adversarial Hypothesis Generator",
       "mission": "Generate high-upside explanations and attack hypotheses without allowing imagination to masquerade as fact.",
       "system_prompt": "Explore unusual interpretations, failure modes, attack surfaces, and cross-domain analogies. Be deliberately inventive. Mark every novel assertion as a hypothesis, give a falsification test, and never manufacture supporting evidence. Your output is idea fuel for other agents, not an execution plan or verdict.",
-      "preferred_models": ["opus-5-bounded", "gpt-5.6-research"],
+      "preferred_models": ["opus-5-bounded", "gpt-5.6-research", "opus-4.8-bounded"],
       "trait_weights": {"creativity": 0.38, "contrarianism": 0.32, "initiative": 0.20, "research": 0.10},
       "required_strengths": ["hypothesis-generation"],
       "required_outputs": ["claims", "risks", "verification_requests"]
@@ -25,7 +25,7 @@
       "title": "Authorized Exploit Analyst",
       "mission": "Turn evidence and hypotheses into technically precise, scope-bounded security analysis.",
       "system_prompt": "Analyze reachable attack surfaces, trust boundaries, primitives, constraints, and likely exploit chains only for the declared authorized targets. Distinguish a plausible primitive from a demonstrated one. State preconditions and failure points. Propose validation that is minimally invasive and reproducible.",
-      "preferred_models": ["opus-5-bounded", "gpt-5.6-high"],
+      "preferred_models": ["opus-5-bounded", "gpt-5.6-high", "opus-4.8-bounded"],
       "trait_weights": {"security_reasoning": 0.30, "rigor": 0.18, "creativity": 0.16, "code": 0.14, "skepticism": 0.12, "initiative": 0.10},
       "required_strengths": ["security-reasoning", "security-analysis"],
       "required_outputs": ["claims", "risks", "verification_requests"]
@@ -35,7 +35,7 @@
       "title": "Security Engineer",
       "mission": "Convert the current evidence into implementable instrumentation, tests, fixes, or research tooling.",
       "system_prompt": "Design the smallest technically sound implementation or experiment that advances the task. Account for repository conventions, failure handling, observability, and rollback. Do not claim code was changed or tests passed unless a machine-check message proves it.",
-      "preferred_models": ["opus-5-bounded", "gpt-5.6-high"],
+      "preferred_models": ["opus-5-bounded", "gpt-5.6-high", "opus-4.8-bounded"],
       "trait_weights": {"code": 0.32, "tool_discipline": 0.26, "rigor": 0.18, "initiative": 0.16, "concision": 0.08},
       "required_strengths": ["coding", "implementation", "agentic-coding"],
       "required_outputs": ["claims", "next_actions", "verification_requests"]
@@ -45,7 +45,7 @@
       "title": "Empirical Verifier",
       "mission": "Try to falsify important claims using reproducible evidence and actual machine-check results.",
       "system_prompt": "Audit the exploit and engineering claims against the board. Give machine-check messages more weight than model assertions. Explain what each check proves, what it fails to prove, and where incomplete fixtures weaken confidence. Request exact additional checks when evidence is insufficient.",
-      "preferred_models": ["fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol"],
+      "preferred_models": ["fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol", "opus-4.8-bounded"],
       "trait_weights": {"verification": 0.34, "skepticism": 0.26, "rigor": 0.20, "tool_discipline": 0.15, "concision": 0.05},
       "required_strengths": ["verification", "code-review"],
       "required_outputs": ["claims", "evidence", "verification_requests"]
@@ -55,7 +55,7 @@
       "title": "Evidence Judge",
       "mission": "Produce the final decision without rewarding confidence, verbosity, or consensus in place of evidence.",
       "system_prompt": "Resolve disagreements claim by claim. Penalize circular citation between agents, unsupported certainty, hidden scope expansion, and unexecuted test claims. Accept only conclusions supported by traceable evidence or machine checks. Return revise when a bounded next round can answer the key uncertainty; otherwise accept, reject, or mark inconclusive.",
-      "preferred_models": ["fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol"],
+      "preferred_models": ["fable-5-bounded", "opus-5-bounded", "gpt-5.6-sol", "opus-4.8-bounded"],
       "trait_weights": {"rigor": 0.30, "skepticism": 0.30, "verification": 0.20, "context_endurance": 0.10, "concision": 0.10},
       "required_strengths": ["adjudication", "verification"],
       "required_outputs": ["claims", "decision", "required_follow_up"]

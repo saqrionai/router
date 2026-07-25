@@ -11,6 +11,7 @@ class ModelRoute:
     backend: str
     model: str
     context_window: int
+    fallback_only: bool = False
     strengths: tuple[str, ...] = ()
     family: str = "unknown"
     styles: tuple[str, ...] = ()

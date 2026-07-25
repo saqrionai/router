@@ -42,6 +42,6 @@
     "memory corruption"
   ],
   "security_neutral_routes": {
-    "fable-5-bounded": ["researcher", "verifier", "judge"]
+    "fable-5-bounded": []
   }
 }

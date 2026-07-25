@@ -105,7 +105,7 @@ class FuguRouterTests(unittest.TestCase):
                 model_ids=("gpt-5.6-high", "gpt-5.6-high"),
             )
 
-    def test_fable_is_limited_to_neutral_roles_for_security_tasks(self) -> None:
+    def test_fable_is_excluded_from_security_tasks_after_native_fallback(self) -> None:
         router = FuguRouter(
             models=self.config.models,
             personas=self.config.personas,
@@ -125,7 +125,7 @@ class FuguRouterTests(unittest.TestCase):
         )
 
         self.assertNotIn("fable-5-bounded", {item.model for item in exploiter})
-        self.assertIn("fable-5-bounded", {item.model for item in verifier})
+        self.assertNotIn("fable-5-bounded", {item.model for item in verifier})
 
     def test_malformed_outcome_counters_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "accepted calls"):

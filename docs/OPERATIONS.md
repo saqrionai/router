@@ -71,6 +71,10 @@ The skill performs this sequence:
 7. write one serialized result checkpoint to the Bead.
 
 Fugu and Beads tools do not launch models.
+The skill selects `security-research-forum` for security, reverse engineering,
+firmware, crash, vulnerability, and other authorization-required work. Clearly
+non-security tasks use `general-forum`, which keeps Fable available for neutral
+verification.
 
 ## Workflow Control
 
@@ -113,8 +117,10 @@ cleanly instead of creating a meaningless placeholder Bead.
 
 Beads uses a single writer. Intake and final checkpoints are serialized, and
 transient Dolt lock conflicts receive bounded retries. Native workflow state
-handles interruption between those checkpoints. `accept` closes the Bead;
-no-progress, rejection, or round exhaustion marks it blocked.
+handles interruption between those checkpoints. The Beads checkpoint is
+written before route-learning observations, so a failed `bd` operation cannot
+train the router on state that was never made durable. `accept` closes the
+Bead; no-progress, rejection, or round exhaustion marks it blocked.
 
 ## Model Routing
 
@@ -130,8 +136,12 @@ enter a native `codex-worker`, which performs exactly one real
 `codex-subagent` call and returns its structured result. This is external model
 transport under native scheduling, not another orchestrator.
 
-Provider failures use the Fugu assignment's declared fallback order. Adding a
-future K3 adapter does not change queue or judge semantics.
+Provider failures use the Fugu assignment's declared fallback order. Native
+Opus 4.8 is recovery-only and immediately follows every primary. It activates
+for unavailable or invalid output and for deterministic evidence-quality
+failures; the queue records the attempted model and exact reason. Model
+disagreement alone never triggers fallback. Adding a future K3 adapter does not
+change queue or judge semantics.
 
 ## UltraCheck
 

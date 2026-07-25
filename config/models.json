@@ -71,6 +71,42 @@
       "profile_confidence": 0.10
     },
     {
+      "id": "opus-4.8-bounded",
+      "backend": "claude-code-bounded",
+      "model": "claude-opus-4-8",
+      "family": "anthropic",
+      "context_window": 1000000,
+      "fallback_only": true,
+      "strengths": [
+        "security-reasoning",
+        "reverse-engineering",
+        "large-context",
+        "code-review",
+        "deep-reasoning"
+      ],
+      "styles": [
+        "methodical",
+        "recovery",
+        "bounded"
+      ],
+      "traits": {
+        "creativity": 0.74,
+        "rigor": 0.94,
+        "skepticism": 0.91,
+        "initiative": 0.72,
+        "code": 0.92,
+        "research": 0.90,
+        "verification": 0.92,
+        "context_endurance": 0.98,
+        "tool_discipline": 0.95,
+        "concision": 0.68,
+        "contrarianism": 0.50,
+        "security_reasoning": 0.93
+      },
+      "profile_source": "native-recovery-smoke-2026-07-24",
+      "profile_confidence": 0.10
+    },
+    {
       "id": "fable-5[1m]",
       "backend": "claude-code",
       "model": "fable",

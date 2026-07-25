@@ -39,9 +39,11 @@ the routed model:
 Pass the complete dispatch to Codex, including authorization boundaries,
 evidence, acceptance criteria, and the instruction to run real checks before
 claiming success. Do not substitute your own analysis for a failed Codex call.
-If that single Codex call fails, return the exact failure and mark the result
-unavailable so the workflow can use its declared fallback. Do not call it a
-second time.
+If that single Codex call fails or hits its bounded Bash timeout, return the
+exact failure with worker `status: failed` so the workflow records the route as
+unavailable and uses its declared fallback. Never normalize provider failure
+to task `blocked`; `blocked` means the model completed normally and found a
+real task-level blocker. Do not call it a second time.
 
 Return Codex's result with only minimal normalization needed to satisfy the
 workflow's requested output shape. Never invent a tool result.

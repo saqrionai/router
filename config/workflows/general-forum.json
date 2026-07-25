@@ -1,0 +1,20 @@
+{
+  "id": "general-forum",
+  "title": "General Research Forum",
+  "description": "Routing roster for neutral non-security research, implementation, verification, and judgment in the Claude-native Fugu forum.",
+  "requires_authorization": false,
+  "max_rounds": 6,
+  "stages": [
+    {
+      "id": "routable-personas",
+      "personas": [
+        "researcher",
+        "bullshitter",
+        "exploiter",
+        "engineer",
+        "verifier",
+        "judge"
+      ]
+    }
+  ]
+}

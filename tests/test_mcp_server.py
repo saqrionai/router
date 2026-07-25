@@ -37,9 +37,32 @@ def test_route_team_maps_models_to_native_agent_types(tmp_path: Path) -> None:
     assert payload["workflow_run_id"].startswith("native-")
     assert payload["execution_plane"] == "claude-native-workflow"
     assert assignments["researcher"]["agent_type"] == "orchestrator:opus-worker"
+    for assignment in assignments.values():
+        assert assignment["model"] != "opus-4.8-bounded"
+        assert assignment["fallback_order"][1] == "opus-4.8-bounded"
     assert assignments["engineer"]["agent_type"] == "orchestrator:codex-worker"
-    assert assignments["verifier"]["agent_type"] == "orchestrator:fable-neutral"
+    assert assignments["verifier"]["agent_type"] == "orchestrator:opus-worker"
     assert assignments["researcher"]["routing_distribution"]
+
+
+def test_security_workflow_excludes_fable_for_neutral_task_text(
+    tmp_path: Path,
+) -> None:
+    payload = server(tmp_path).call_tool(
+        "route_team",
+        {
+            "task": "compare my patch with the maintainer patch",
+            "workflow": "security-research-forum",
+        },
+    )
+
+    for assignment in payload["assignments"]:
+        assert assignment["model"] != "fable-5-bounded"
+        assert "fable-5-bounded" not in assignment["fallback_order"]
+        assert all(
+            candidate["model"] != "fable-5-bounded"
+            for candidate in assignment["routing_distribution"]
+        )
 
 
 def test_stdio_protocol_lists_and_calls_tools(tmp_path: Path) -> None:

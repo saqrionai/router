@@ -25,8 +25,9 @@ Claude native workflow scheduler
              +--> Fugu routing MCP (policy only)
              |
              +--> Opus 5 native workers
-             +--> Fable 5 neutral reviewers
+             +--> Fable 5 neutral non-security reviewers
              +--> codex-worker --> real GPT-5.6 call
+             +--> Opus 4.8 native recovery (quality-gated fallback only)
              |
              v
 criterion-level judge gate
@@ -66,6 +67,10 @@ Then run:
 /orchestrator:orchestrate continue
 ```
 
+The skill routes security and authorization-required work through
+`security-research-forum`; clearly non-security work uses `general-forum`, where
+Fable remains eligible as a neutral verifier.
+
 Use `/workflows` to inspect phases, queue activity, agents, prompts, tools,
 tokens, and results. Claude Code saves workflow progress for session resumption.
 
@@ -102,12 +107,18 @@ The active catalog intentionally contains only:
 
 - Opus 5 full-context and bounded routes;
 - Fable 5 full-context and bounded neutral-review routes; and
-- GPT-5.6 research, high, and Sol routes through Codex.
+- GPT-5.6 research, high, and Sol routes through Codex; plus
+- Opus 4.8 as a native recovery-only route.
 
 The Anthropic subscription carries high-volume work. GPT routes are used where
 engineering strength or provider independence justifies the smaller OpenAI
-allowance. Future providers such as K3 use another bounded adapter; the native
-scheduler and Fugu policy remain unchanged.
+allowance. Opus 4.8 is never composed as a primary. It is attempted when a
+primary route is unavailable, structurally invalid, or fails conservative
+evidence-quality checks. Fable is excluded from every security-task assignment
+because its provider can silently fall back to Opus when supplied security
+evidence, which would make route telemetry inaccurate. Future providers such as
+K3 use another bounded adapter; the native scheduler and Fugu policy remain
+unchanged.
 
 Inspect policy without launching models:
 

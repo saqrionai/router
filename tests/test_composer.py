@@ -26,13 +26,13 @@ class ComposerTests(unittest.TestCase):
         }
 
         self.assertEqual(len(plan.assignments), 6)
-        self.assertEqual(plan.unique_models, 4)
+        self.assertEqual(plan.unique_models, 3)
         self.assertEqual(plan.unique_families, 2)
         self.assertEqual(selected["researcher"], "opus-5-bounded")
         self.assertEqual(selected["bullshitter"], "opus-5-bounded")
         self.assertEqual(selected["exploiter"], "opus-5-bounded")
         self.assertEqual(selected["engineer"], "gpt-5.6-high")
-        self.assertEqual(selected["verifier"], "fable-5-bounded")
+        self.assertEqual(selected["verifier"], "opus-5-bounded")
         self.assertEqual(selected["judge"], "gpt-5.6-sol")
         self.assertNotEqual(
             self.config.models[selected["engineer"]].family,
@@ -45,6 +45,12 @@ class ComposerTests(unittest.TestCase):
         for persona_id in ("bullshitter", "exploiter", "engineer"):
             assignment = plan.assignment_for(persona_id)
             self.assertNotIn("fable-5-bounded", assignment.fallback_order)
+        for assignment in plan.assignments:
+            self.assertNotEqual(assignment.model, "opus-4.8-bounded")
+            self.assertEqual(
+                assignment.fallback_order[1],
+                "opus-4.8-bounded",
+            )
 
     def test_selected_model_leads_fallback_order(self) -> None:
         plan = self.composer.compose(self.workflow, "implement and debug code")
@@ -52,8 +58,39 @@ class ComposerTests(unittest.TestCase):
             self.assertEqual(assignment.fallback_order[0], assignment.model)
             self.assertEqual(
                 set(assignment.fallback_order),
-                set(self.config.personas[assignment.persona].preferred_models),
+                {
+                    model_id
+                    for model_id in self.config.personas[
+                        assignment.persona
+                    ].preferred_models
+                    if model_id != "fable-5-bounded"
+                },
             )
+
+    def test_authorization_required_workflow_excludes_fable_for_neutral_text(
+        self,
+    ) -> None:
+        plan = self.composer.compose(
+            self.workflow,
+            "compare my patch with the maintainer patch",
+        )
+
+        for assignment in plan.assignments:
+            self.assertNotEqual(assignment.model, "fable-5-bounded")
+            self.assertNotIn("fable-5-bounded", assignment.fallback_order)
+
+    def test_general_workflow_keeps_fable_available_for_non_security_work(
+        self,
+    ) -> None:
+        workflow = self.config.workflow("general-forum")
+        plan = self.composer.compose(
+            workflow,
+            "review this product proposal and verify every claim",
+        )
+
+        verifier = plan.assignment_for("verifier")
+        self.assertEqual(verifier.model, "fable-5-bounded")
+        self.assertIn("fable-5-bounded", verifier.fallback_order)
 
     def test_task_signals_are_explainable(self) -> None:
         plan = self.composer.compose(
