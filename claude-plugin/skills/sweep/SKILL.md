@@ -9,7 +9,7 @@ allowed-tools:
   - mcp__plugin_orchestrator_fugu__route_team
   - mcp__plugin_orchestrator_fugu__prepare_bead
   - mcp__plugin_orchestrator_fugu__checkpoint_bead
-  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:sweep-opus-worker, orchestrator:sweep-codex-worker, orchestrator:sweep-integrator)
+  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:sweep-planner, orchestrator:sweep-opus-worker, orchestrator:sweep-codex-worker, orchestrator:sweep-integrator)
   - TaskCreate
   - TaskUpdate
   - TaskList
@@ -75,9 +75,12 @@ separate; asking for 64 agents means up to 64 validated units, not 64
 simultaneous writers.
 
 7. Stop if the planner returns anything except `status: planned`. Do not repair
-   an invalid plan informally. Tell the user which Bead was selected, the
-   planned unit count, dependency shape, concurrency bound, persona routes, and
-   risk-review counts.
+   an invalid plan informally. Planning uses one low-effort, six-turn native
+   agent and parses its JSON once without structured-output retries. Empty or
+   malformed output is a typed `invalid-plan` infrastructure failure, never a
+   reason to relaunch the planner in the same run. Tell the user which Bead was
+   selected, the planned unit count, dependency shape, concurrency bound,
+   persona routes, and risk-review counts.
 8. Materialize every plan unit with `TaskCreate`, preserve `dependsOn` through
    task dependencies, and keep its unit ID in the task subject. Tasks are the
    live native queue; Beads remains the durable project history.

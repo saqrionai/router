@@ -10,6 +10,7 @@ SWEEP_SKILL = ROOT / "claude-plugin" / "skills" / "sweep" / "SKILL.md"
 OPUS_WORKER = ROOT / "claude-plugin" / "agents" / "sweep-opus-worker.md"
 CODEX_WORKER = ROOT / "claude-plugin" / "agents" / "sweep-codex-worker.md"
 INTEGRATOR = ROOT / "claude-plugin" / "agents" / "sweep-integrator.md"
+PLANNER = ROOT / "claude-plugin" / "agents" / "sweep-planner.md"
 
 
 def run_node(source: str) -> None:
@@ -28,6 +29,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     opus = OPUS_WORKER.read_text(encoding="utf-8")
     codex = CODEX_WORKER.read_text(encoding="utf-8")
     integrator = INTEGRATOR.read_text(encoding="utf-8")
+    bounded_planner = PLANNER.read_text(encoding="utf-8")
 
     assert "Math.min(Number(input.maxUnits || 64), 64)" in planner
     assert "Math.min(Number(input.maxConcurrency || 8), 12)" in planner
@@ -35,6 +37,10 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "function ownerRoutes(unit, writingOrdinal)" in planner
     assert "writingOrdinal % 4 === 1" in planner
     assert "READ-ONLY SWEEP PLANNER" in planner
+    assert "agentType: 'orchestrator:sweep-planner'" in planner
+    assert "schema: planSchema" not in planner
+    assert "parsePlannerOutput(rawPlan)" in planner
+    assert "planner returned empty output" in planner
     assert "Do not emit persona-review" in planner
     assert "sweep-opus-worker" not in planner
     assert "sweep-codex-worker" not in planner
@@ -44,7 +50,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "every writes=false unit MUST return paths=[]" in planner
     assert "Every unit id MUST be lowercase" in planner
     assert "Every writing path MUST be relative to the" in planner
-    assert "pattern: '^[a-z0-9][a-z0-9._-]{0,63}$'" in planner
+    assert "^[a-z0-9][a-z0-9._-]{0,63}$" in planner
     assert "await parallel([" in final
     assert "READ-ONLY FINAL SWEEP AUDIT" in final
     assert "criterionErrors" in final
@@ -70,6 +76,11 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "exact opaque agent/task identifier" in skill
     assert "Never synthesize a task ID" in skill
     assert "Do not invoke `/batch`" in skill
+    assert "parses its JSON once without structured-output retries" in skill
+    assert "effort: low" in bounded_planner
+    assert "maxTurns: 6" in bounded_planner
+    assert "tools: Read, Glob, Grep, Bash" in bounded_planner
+    assert "This is a single attempt" in bounded_planner
     assert "isolation: worktree" in opus
     assert "isolation: worktree" in codex
     assert "do not call `EnterWorktree`" in opus
@@ -89,6 +100,31 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "restart Claude from the current main HEAD" in skill
     assert "':(exclude).claude/worktrees/**'" in integrator
     assert "Do not ignore any other `.claude` path" in integrator
+
+
+def test_planner_output_parser_is_single_attempt_and_deterministic() -> None:
+    source = SWEEP.read_text(encoding="utf-8")
+    start = source.index("function parsePlannerOutput")
+    end = source.index("\n\nphase('Plan')", start)
+    parser = source[start:end]
+    cases = [
+        [{"status": "completed"}, "completed", ""],
+        ['{"status":"blocked"}', "blocked", ""],
+        ["```json\n{\"status\":\"completed\"}\n```", "completed", ""],
+        ["", None, "planner returned empty output"],
+        ["not json", None, "planner output is not valid JSON"],
+        ["[]", None, "planner output is not a JSON object"],
+    ]
+    script = (
+        f"{parser}\n"
+        f"const cases = {json.dumps(cases)};\n"
+        "for (const [value, status, error] of cases) {\n"
+        "  const parsed = parsePlannerOutput(value);\n"
+        "  if ((parsed.plan?.status || null) !== status) process.exit(1);\n"
+        "  if (!String(parsed.error).includes(error)) process.exit(1);\n"
+        "}\n"
+    )
+    run_node(script)
 
 
 def test_plan_validator_rejects_cycles_escapes_and_parallel_overlap() -> None:

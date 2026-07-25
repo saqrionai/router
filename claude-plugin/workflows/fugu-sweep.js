@@ -62,84 +62,6 @@ const risks = new Set(['low', 'medium', 'high', 'critical'])
 const kinds = new Set(['research', 'implementation', 'test', 'artifact'])
 const resources = new Set(['light', 'medium', 'heavy'])
 
-const planSchema = {
-  type: 'object',
-  required: ['status', 'summary', 'baseSha', 'repoClean', 'units'],
-  properties: {
-    status: { type: 'string', enum: ['completed', 'blocked'] },
-    summary: { type: 'string' },
-    baseSha: { type: 'string' },
-    repoClean: { type: 'boolean' },
-    units: {
-      type: 'array',
-      minItems: 1,
-      maxItems: 64,
-      items: {
-        type: 'object',
-        required: [
-          'id',
-          'title',
-          'objective',
-          'kind',
-          'writes',
-          'risk',
-          'resource',
-          'persona',
-          'paths',
-          'dependsOn',
-          'acceptanceCriteria',
-          'checks',
-        ],
-        properties: {
-          id: {
-            type: 'string',
-            pattern: '^[a-z0-9][a-z0-9._-]{0,63}$',
-          },
-          title: { type: 'string' },
-          objective: { type: 'string' },
-          kind: {
-            type: 'string',
-            enum: ['research', 'implementation', 'test', 'artifact'],
-          },
-          writes: { type: 'boolean' },
-          risk: {
-            type: 'string',
-            enum: ['low', 'medium', 'high', 'critical'],
-          },
-          resource: {
-            type: 'string',
-            enum: ['light', 'medium', 'heavy'],
-          },
-          persona: {
-            type: 'string',
-            enum: [
-              'researcher',
-              'bullshitter',
-              'exploiter',
-              'engineer',
-              'verifier',
-            ],
-          },
-          paths: {
-            type: 'array',
-            items: {
-              type: 'string',
-              pattern: '^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$)).+',
-            },
-          },
-          dependsOn: { type: 'array', items: { type: 'string' } },
-          acceptanceCriteria: {
-            type: 'array',
-            minItems: 1,
-            items: { type: 'string' },
-          },
-          checks: { type: 'array', items: { type: 'string' } },
-        },
-      },
-    },
-  },
-}
-
 function normalPath(value) {
   return String(value || '').trim().replace(/^\.\//, '').replace(/\/+/g, '/')
 }
@@ -340,9 +262,31 @@ function ownerRoutes(unit, writingOrdinal) {
   return [opus, ...selected.filter(model => model !== opus)]
 }
 
+function parsePlannerOutput(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { plan: value, error: '' }
+  }
+  const raw = String(value || '').trim()
+  if (!raw) return { plan: null, error: 'planner returned empty output' }
+  const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  const candidate = fenced ? fenced[1].trim() : raw
+  try {
+    const plan = JSON.parse(candidate)
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+      return { plan: null, error: 'planner output is not a JSON object' }
+    }
+    return { plan, error: '' }
+  } catch (error) {
+    return {
+      plan: null,
+      error: `planner output is not valid JSON: ${String(error.message || error)}`,
+    }
+  }
+}
+
 phase('Plan')
 const plannerModel = 'opus-5-bounded'
-const plan = await agent(`READ-ONLY SWEEP PLANNER
+const rawPlan = await agent(`READ-ONLY SWEEP PLANNER
 WORKFLOW RUN: ${workflowRunId}
 ROUTED MODEL: ${plannerModel}
 WORKSPACE: ${workspace}
@@ -375,6 +319,8 @@ Writing units need disjoint concurrent path scopes and real checks. Add a
 dependency whenever units overlap or consume another unit's result. Assign the
 best owner persona. Fable may own read-only neutral research but can never own
 a writing unit; every writing persona must have an Opus 5 or GPT-5.6 route.
+Return only one JSON object with this exact shape and no Markdown fence:
+{"status":"completed|blocked","summary":"...","baseSha":"git object id","repoClean":true,"units":[{"id":"lowercase-id","title":"...","objective":"...","kind":"research|implementation|test|artifact","writes":true,"risk":"low|medium|high|critical","resource":"light|medium|heavy","persona":"researcher|bullshitter|exploiter|engineer|verifier","paths":["relative/path/**"],"dependsOn":[],"acceptanceCriteria":["..."],"checks":["..."]}]}
 Do not emit persona-review units or units whose only
 purpose is to rerun project-wide integration checks; the parent runs these
 after merge:
@@ -384,12 +330,15 @@ ${integrationChecks.length
 Return blocked if uncommitted state makes isolated writers unsound.`, {
   label: 'sweep-planner',
   phase: 'Plan',
-  agentType: agentTypeForModel(plannerModel),
-  schema: planSchema,
+  agentType: 'orchestrator:sweep-planner',
 })
 
 phase('Validate')
-const planErrors = validatePlan(plan)
+const parsedPlan = parsePlannerOutput(rawPlan)
+const plan = parsedPlan.plan
+const planErrors = parsedPlan.error
+  ? [parsedPlan.error]
+  : validatePlan(plan)
 if (planErrors.length) {
   return {
     workflowRunId,
