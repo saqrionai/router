@@ -53,8 +53,12 @@ start with a clean first-party environment.
 Start Claude Code in the target repository with the native Opus model:
 
 ```sh
-claude --model opus
+claude
 ```
+
+The installed `~/bin/claude` wrapper defaults to native Opus and removes stale
+gateway overrides. A Codex transcript cannot be resumed as a Claude
+conversation; Beads and repository artifacts provide the cross-client handoff.
 
 Then run:
 

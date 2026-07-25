@@ -28,7 +28,15 @@ first-party wrapper:
 ```
 
 That wrapper removes inherited gateway, Bedrock, Vertex, and Foundry overrides
-before Claude starts. Do not launch `~/.local/bin/claude` directly.
+before Claude starts and defaults to native Opus. Do not launch
+`~/.local/bin/claude` directly.
+
+Claude and Codex maintain different conversation stores. Starting Claude in a
+repository that was previously used only by Codex creates a new Claude
+conversation; it cannot convert or resume the Codex transcript. The repository,
+Beads history, and committed artifacts are the durable handoff. Use `claude`
+for that first native session. Use `claude -c` only after the repository has a
+useful Claude session to continue.
 
 Codex can share Fugu routing policy and Beads tools through the
 `orchestrator-fugu` MCP server. It does not gain Claude's Workflow runtime and
