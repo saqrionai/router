@@ -30,7 +30,8 @@ def test_workflow_modes_have_bounded_graph_and_queue_evidence() -> None:
 def test_codex_adapter_is_one_call_and_non_git_safe() -> None:
     source = CODEX_AGENT.read_text(encoding="utf-8")
 
-    assert "maxTurns: 18" in source
+    assert "effort: low" in source
+    assert "maxTurns: 10" in source
     assert "exactly once" in source
     assert "--skip-git-repo-check" in source
     assert "agent-supervisor" in source
@@ -41,6 +42,7 @@ def test_codex_adapter_is_one_call_and_non_git_safe() -> None:
     assert "CODEX_SUBAGENT_REASONING_EFFORT=" in source
     assert "CODEX_SUBAGENT_SANDBOX=" in source
     assert "Do not inspect the wrapper" in source
+    assert "not draft, inspect, or append the prompt in phases" in source
     assert "Do not call it a second time" in source.replace("\n", " ")
     assert "status: failed" in source
     assert "Never normalize provider failure" in source

@@ -59,6 +59,32 @@ Start substantial work with:
 /orchestrator:orchestrate continue
 ```
 
+For a broad project with multiple independent implementation units, use:
+
+```text
+/orchestrator:sweep continue
+```
+
+The planner workflow validates a dependency DAG. The skill queues at most 64
+native tasks, keeps a bounded weighted worker pool active, launches writing
+owners through direct native worktree Agents, applies independent persona
+review by risk, and serially cherry-picks accepted commits. A final saved
+workflow independently audits the integrated checkout. It never pushes or
+opens PRs without explicit operator direction.
+
+`/batch` remains an interactive user command and cannot be invoked by a skill
+or workflow. Sweep uses the same supported direct Agent worktree primitive with
+Fugu routing, risk review, exact acceptance gates, and Beads checkpoints.
+Planning and final audit are visible under `/workflows`; owner and reviewer
+fan-out is visible in Claude Code's native agent/task views.
+The coordinator retains Claude's opaque ID for each launched agent. Labels and
+teammate names are display metadata and must never be reconstructed into task
+IDs for result retrieval or cancellation.
+Native status, tool, token/output, supervisor-process, and Git changes count as
+heartbeats. Ten minutes without any signal stops that exact agent and permits
+one declared fallback. Its dependency descendants remain blocked, while
+unrelated ready units continue.
+
 The skill performs this sequence:
 
 1. automatically resume the highest-priority in-progress Bead, otherwise claim

@@ -1,8 +1,27 @@
 # Native Workflow Examples
 
-Every example below launches the same saved `orchestrator:fugu-forum` workflow.
-Fugu changes route assignments; it does not create a second execution graph.
-Inspect and control the run with `/workflows`.
+The plugin has two native topologies. `fugu-forum` builds one artifact through
+bounded adversarial review. Sweep uses the saved `fugu-sweep` read-only planner,
+direct native worktree Agents for dependency-ready implementation units, and
+the saved `fugu-sweep-final` audit. Fugu changes persona/model assignments; it
+does not launch agents or create another daemon.
+
+## Large Project Sweep
+
+```text
+/orchestrator:sweep Continue the current software-engineering project. Build a
+validated dependency graph from the active Bead and repository state, run
+independent units in parallel worktrees, verify by risk, and integrate only
+passing scoped commits. Do not push.
+```
+
+The planner may queue up to 64 units. The default weighted active capacity is
+8, so heavy builds do not run 64 copies at once. Owners get task-specific
+personas and Fugu routes. Critical and high-risk units always get independent
+review; medium and low risk use deterministic cohort sampling. A serial
+integrator stops on dirty state, unexpected paths, conflicts, or failed checks.
+Planning and final audit appear in `/workflows`; owner waves and reviewers
+appear in Claude Code's native agent and task views.
 
 ## Quick Evidence Gate
 

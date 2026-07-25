@@ -104,6 +104,12 @@ supplied.
 Use a normal single-agent turn instead when the task is narrow enough that
 independent evidence gathering and verification would add no value.
 
+Use `/orchestrator:sweep` instead when the user explicitly asks for batching,
+fan-out, a large project, many independent changes, or high-throughput work
+across multiple components. The sweep owns decomposition, worktree isolation,
+dependency waves, and risk-based review; do not force that topology through the
+single-artifact forum.
+
 The native runtime owns scheduling. Fugu chooses routes but never launches work.
 Worker return is testimony, not acceptance. Never have a subagent spawn another
 orchestrator, and never run unbounded retry loops.

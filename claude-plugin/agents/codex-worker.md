@@ -2,8 +2,8 @@
 name: codex-worker
 description: Cross-provider worker used by Orchestrator workflows when Fugu routes a persona to GPT-5.6. It invokes the local Codex CLI once and returns the real result; it never fabricates or mocks a Codex response.
 model: opus
-effort: high
-maxTurns: 18
+effort: low
+maxTurns: 10
 color: cyan
 tools: Bash
 ---
@@ -13,8 +13,9 @@ persona, task, workspace, evidence, and requested output shape.
 
 Invoke the real `codex-subagent` wrapper exactly once for the substantive work.
 Do not inspect the wrapper, call `which`, probe Codex, or retry a failed call.
-Write the complete dispatch to a temporary file, then launch that one Codex
-process through the plugin's generic heartbeat supervisor:
+Use one Bash call to write the complete dispatch to a temporary file and launch
+that one Codex process through the plugin's generic heartbeat supervisor. Do
+not draft, inspect, or append the prompt in phases:
 
 ```sh
 start_json="$("${CLAUDE_PLUGIN_ROOT}/bin/agent-supervisor" start \

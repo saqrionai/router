@@ -5,7 +5,11 @@ execution plane for Orchestrator.
 
 - `/orchestrator:orchestrate <task>` asks Fugu to route personas, then launches
   the native `orchestrator:fugu-forum` workflow.
-- `/workflows` shows phases, agents, prompts, tool activity, tokens, and results.
+- `/orchestrator:sweep <project>` builds a validated dependency graph, fans out
+  routed owners through direct native worktree Agents, applies risk-based
+  independent review, and serially integrates accepted commits.
+- `/workflows` shows sweep planning and final audit. Claude Code's native agent
+  and task views show owner waves, reviewers, models, activity, and results.
 - Opus 5 handles native research, security analysis, and synthesis.
 - Fable 5 is restricted to neutral, non-security research, verification, and
   judgment. Security tasks exclude Fable because its provider can silently
@@ -15,6 +19,9 @@ execution plane for Orchestrator.
   descendant activity, completion, idle timeout, or total deadline.
 - Beads is the durable outer queue; the workflow returns its in-run queue and
   closes a Bead only after criterion-level acceptance.
+- Sweep queue capacity is 64 units with a separately bounded active pool.
+  Personas are assigned per unit; only risky or sampled units pay for
+  independent verifier passes.
 - Revision waves stop on acceptance, rejection, repeated no-progress, or the
   configured round budget.
 - Lifecycle hooks append native events to

@@ -1,14 +1,16 @@
 # Orchestrator
 
-Orchestrator is a Fugu-routed, multi-model plugin for Claude Code native dynamic
-workflows. Claude Code owns scheduling, parallelism, worktree isolation,
-resumption, and the `/workflows` interface. Orchestrator contributes:
+Orchestrator is a Fugu-routed, multi-model plugin for Claude Code's native
+workflow and Agent runtimes. Claude Code owns execution, parallelism, worktree
+isolation, resumption, and its workflow, agent, and task interfaces.
+Orchestrator contributes:
 
 - six evidence-oriented personas;
 - learned model/persona routing;
 - bounded OpenAI delegation through the real Codex CLI;
 - heartbeat-aware supervision for process-backed model adapters;
 - an explicit in-run work queue;
+- a dependency-aware 64-unit sweep with bounded worktree fan-out;
 - independent criterion-level verification and judgment;
 - no-progress and round-budget stops;
 - structural UltraCheck gates;
@@ -21,10 +23,12 @@ There is one execution plane:
 Bead task and acceptance criteria
              |
              v
-Claude native workflow scheduler
+Claude Code native execution plane
              |
              +--> Fugu routing MCP (policy only)
              |
+             +--> saved dynamic workflows (forum, planning, final audit)
+             +--> direct isolated Agents (sweep owners and reviewers)
              +--> Opus 5 native workers
              +--> Fable 5 neutral non-security reviewers
              +--> codex-worker --> supervised real GPT-5.6 call
@@ -70,6 +74,12 @@ Then run:
 ```text
 /orchestrator:orchestrate continue
 ```
+
+Use `/orchestrator:sweep continue` for a broad software-engineering or
+authorized security project with independently ownable units. Sweep uses saved
+native workflows for planning and final audit, then direct native worktree
+agents for implementation. The forum and sweep share the same Fugu policy,
+Beads intake, telemetry, and Claude Code control surfaces.
 
 The skill routes security and authorization-required work through
 `security-research-forum`; clearly non-security work uses `general-forum`, where
@@ -144,7 +154,11 @@ dashboard runtime; `/workflows` is the live interface.
 ## Files
 
 - `claude-plugin/workflows/fugu-forum.js`: native queue and evidence gates.
+- `claude-plugin/workflows/fugu-sweep.js`: read-only dependency planner.
+- `claude-plugin/workflows/fugu-sweep-final.js`: independent final audit and
+  exact acceptance gate.
 - `claude-plugin/skills/orchestrate/SKILL.md`: native intake and Beads contract.
+- `claude-plugin/skills/sweep/SKILL.md`: high-throughput native project entry.
 - `claude-plugin/agents/`: Opus, Fable, and Codex worker boundaries.
 - `claude-plugin/examples/README.md`: native workflow examples.
 - `src/orchestrator/mcp_server.py`: Fugu and Beads support tools.

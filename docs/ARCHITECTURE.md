@@ -1,10 +1,12 @@
 # Architecture
 
-## One Execution Plane
+## One Native Execution Plane
 
-Claude Code native dynamic workflows are the sole scheduler. They own phases,
-parallel agents, tool execution, worktrees, interruption, resumption, token
-telemetry, and the `/workflows` interface.
+Claude Code is the sole execution plane. Saved dynamic workflows own forum
+phases plus sweep planning and final audit. Direct native Agent calls own sweep
+writer isolation, reviewer fan-out, and serial integration. Claude Code owns
+interruption, resumption, token telemetry, agent/task views, and `/workflows`.
+There is no external scheduler.
 
 Orchestrator adds four support boundaries:
 
@@ -41,6 +43,36 @@ Each queue unit records persona, logical route, native agent type, attempted
 fallbacks, per-attempt quality outcomes and reasons, status, round, and summary.
 Worker return is testimony. Only the deterministic judge gate can accept the
 task.
+
+The sweep topology is for broad projects:
+
+1. a routed planner inspects the real repository and emits at most 64 units;
+2. JavaScript rejects cycles, unsafe paths, dirty writer bases, missing checks,
+   and unordered overlapping write scopes;
+3. the skill creates a native task DAG and launches dependency-ready owners in
+   weighted parallel waves;
+4. writing owners use direct native `Agent(..., isolation: worktree)` calls and
+   return scoped commits;
+5. high-risk units always receive independent persona review, critical units
+   receive two reviews, and lower-risk cohorts use deterministic sampling;
+6. one serial integration agent inspects and cherry-picks accepted commits; and
+7. one project judge resolves the original acceptance criteria against the
+   resulting main checkout.
+
+Queue capacity and active concurrency are separate. The default queue can hold
+64 units while weighted active capacity is 8. Fugu selects a persona/model
+route for each unit role; it does not decide dependency readiness. When GPT is
+the routed engineering primary, the first and every fourth writing unit use it
+while Opus 5 carries the remaining writer fan-out. This keeps an independent
+provider sample without spending the smaller OpenAI allowance on every unit.
+
+This split is required by observed Claude Code 2.1.220 behavior. A real
+repository probe showed that direct Agent calls honor `isolation: worktree`,
+while agents spawned inside a dynamic workflow ignore custom-agent isolation
+and explicit `cwd`. Writer agents therefore fail closed unless their current
+Git directory is a linked worktree distinct from the main checkout.
+Claude places active linked worktrees under `.claude/worktrees/`; integration
+cleanliness excludes exactly that runtime path and no other dirty state.
 
 ## Model Adapters
 
@@ -96,7 +128,8 @@ Beads is the canonical project queue and history. It is not the subagent chat
 bus.
 
 Before launch, the skill atomically claims a named Bead or creates a dedicated
-one. An already-running Bead blocks duplicate workflow launch. After terminal
+one. An already-running Bead blocks duplicate workflow launch. Forum and sweep
+use the same lease and checkpoint boundary. After terminal
 judgment, the skill performs one serialized checkpoint containing the task,
 workflow id, stop reason, queue, models, and verdict. Only acceptance closes the
 issue.
