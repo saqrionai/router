@@ -14,13 +14,19 @@ write scopes, checks, dependencies, authorization, and requested schema.
 
 The parent must launch you through a direct native `Agent` call with
 `isolation: worktree`; do not call `EnterWorktree`. Before any edit, record
-`pwd -P`, the current branch, the base commit, `git rev-parse --git-dir`, and
-`git rev-parse --git-common-dir`. Fail without editing if the current directory
-equals the main workspace from the dispatch, the branch is the main branch, or
-Git does not report a linked worktree whose Git directory differs from its
-common directory. Work only in that verified worktree. Do not touch a path
-outside the declared write scopes. Do not push, open a PR, merge, rebase, or
-modify the operator's main checkout.
+`pwd -P`, the current branch, `git rev-parse HEAD`, `git rev-parse --git-dir`,
+and `git rev-parse --git-common-dir`. Fail without editing if the current
+directory equals the main workspace from the dispatch, the branch is the main
+branch, the current HEAD does not equal the dispatched base SHA, or Git does
+not report a linked worktree whose Git directory differs from its common
+directory. A base mismatch is a typed infrastructure failure that requires a
+fresh parent Claude session; never merge or rebase around it. Work only in that
+verified worktree. Do not touch a path outside the declared write scopes. Do
+not push, open a PR, merge, rebase, or modify the operator's main checkout.
+
+Beads belongs to the coordinator in the main checkout. Do not invoke `bd`, read
+or write `.beads`, claim issues, or checkpoint project state from this
+worktree.
 
 Implement the smallest complete change for this unit. Run every declared check
 that is applicable. A check that was not run is not passing evidence. Inspect

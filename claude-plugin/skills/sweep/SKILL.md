@@ -98,6 +98,10 @@ simultaneous writers.
    sampling without exhausting the smaller OpenAI allowance during large
    sweeps.
 
+   Beads is centralized coordinator state. Writing and read-only unit workers
+   must not invoke `bd` or access `.beads` from a worktree; only the parent in
+   the main checkout claims and checkpoints the selected Bead.
+
    Do not launch a writing owner through `Workflow.agent()`: Claude Code
    2.1.220 ignores custom-agent worktree isolation and explicit `cwd` there.
    Direct native `Agent(..., isolation: worktree)` is the supported path and
@@ -125,8 +129,13 @@ simultaneous writers.
 ```
 
    A writing result is usable only when its worktree differs from the main
-   workspace, Git reports a linked worktree, its real commit descends from the
-   planned base, every changed path is declared, and all required checks passed.
+   workspace, Git reports a linked worktree, and its initial HEAD exactly
+   equals the dispatched planned base. A base mismatch means Claude retained a
+   stale session checkout: stop the worker before model launch, checkpoint an
+   infrastructure failure, and restart Claude from the current main HEAD.
+   Never merge or rebase around session-base drift. Its real commit must
+   descend from the planned base, every changed path must be declared, and all
+   required checks must pass.
    A returned response alone is never success. A read-only unit may use the
    Fugu-selected standard agent without worktree isolation and must return
    concrete evidence. Mark the corresponding native task completed only after

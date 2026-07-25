@@ -10,6 +10,7 @@ __pycache__/
 dist/
 web/
 *.tsbuildinfo
+.claude/worktrees/
 
 
 # Beads / Dolt files (added by bd init)

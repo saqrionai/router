@@ -323,7 +323,11 @@ function routes(persona) {
 }
 
 function ownerRoutes(unit, writingOrdinal) {
-  const selected = routes(unit.persona)
+  const routed = routes(unit.persona)
+  const selected = unit.writes
+    ? routed.filter(model => !model.startsWith('fable-5'))
+    : routed
+  if (unit.writes && !selected.length) selected.push('opus-5-bounded')
   if (
     !unit.writes
     || !selected[0].startsWith('gpt-5.6')
@@ -369,7 +373,9 @@ Every unit id MUST be lowercase and match
 workspace: never emit an absolute path, .git path, or parent traversal.
 Writing units need disjoint concurrent path scopes and real checks. Add a
 dependency whenever units overlap or consume another unit's result. Assign the
-best owner persona. Do not emit persona-review units or units whose only
+best owner persona. Fable may own read-only neutral research but can never own
+a writing unit; every writing persona must have an Opus 5 or GPT-5.6 route.
+Do not emit persona-review units or units whose only
 purpose is to rerun project-wide integration checks; the parent runs these
 after merge:
 ${integrationChecks.length

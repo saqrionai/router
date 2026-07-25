@@ -79,6 +79,14 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "effort: low" in codex
     assert "maxTurns: 10" in codex
     assert "Do not draft, inspect, or append the prompt in phases" in codex
+    for worker in (opus, codex):
+        normalized_worker = " ".join(worker.split())
+        assert "current HEAD does not equal the dispatched base SHA" in worker
+        assert "typed infrastructure failure" in worker
+        assert "Do not invoke `bd`" in worker
+        assert "read or write `.beads`" in normalized_worker
+    assert "Beads is centralized coordinator state" in skill
+    assert "restart Claude from the current main HEAD" in skill
     assert "':(exclude).claude/worktrees/**'" in integrator
     assert "Do not ignore any other `.claude` path" in integrator
 
@@ -238,6 +246,28 @@ def test_risk_policy_is_deterministic_and_escalates_high_risk() -> None:
         "if (verificationCount(low, true) !== 1) process.exit(1);\n"
         "if (verificationCount(low, false) !== "
         "verificationCount(low, false)) process.exit(1);\n"
+    )
+
+    run_node(script)
+
+
+def test_writing_owner_routes_remove_fable_and_keep_read_only_fable() -> None:
+    source = SWEEP.read_text(encoding="utf-8")
+    start = source.index("function ownerRoutes")
+    end = source.index("phase('Plan')")
+    helper = source[start:end]
+    script = (
+        "function routes(persona) {\n"
+        "  if (persona === 'verifier') return ['fable-5-bounded'];\n"
+        "  return ['gpt-5.6-high', 'opus-5-bounded'];\n"
+        "}\n"
+        f"{helper}\n"
+        "const writing = ownerRoutes({writes:true,persona:'verifier'}, 1);\n"
+        "if (JSON.stringify(writing) !== JSON.stringify(['opus-5-bounded'])) "
+        "process.exit(1);\n"
+        "const reading = ownerRoutes({writes:false,persona:'verifier'}, 0);\n"
+        "if (JSON.stringify(reading) !== JSON.stringify(['fable-5-bounded'])) "
+        "process.exit(1);\n"
     )
 
     run_node(script)
