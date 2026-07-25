@@ -45,6 +45,8 @@ class TeamPolicy:
     independence_model_penalty: float
     independence_family_penalty: float
     independence_pairs: tuple[tuple[str, str], ...]
+    routing_mode: str = "shadow"
+    profile_stale_after_days: int = 30
     task_signals: dict[str, dict[str, float]] = field(default_factory=dict)
     security_task_keywords: tuple[str, ...] = ()
     security_neutral_routes: dict[str, tuple[str, ...]] = field(default_factory=dict)

@@ -5,6 +5,15 @@ Effective scoring shrinks every trait toward neutral according to
 `profile_confidence`; live terminal outcomes and structured-output reliability
 gradually calibrate the Fugu router.
 
+Policy currently runs in `shadow` mode. Fugu computes and records its
+distribution and top recommendation, but learned adjustments and behavioral
+trait priors do not select the live team. Eligibility, declared route order,
+required capabilities, capacity policy, and provider-independence constraints
+remain active. Promotion to `active` is a deliberate policy change after a
+representative hand-labeled evaluation and enough attributable judge outcomes.
+`orch doctor` warns when a profile source is undated or older than the policy's
+freshness threshold.
+
 ## Active Routes
 
 | Route | Backend | Role |
@@ -14,9 +23,16 @@ gradually calibrate the Fugu router.
 | `opus-4.8-bounded` | Native Claude Code | Recovery-only worker after an objective response-quality failure |
 | `fable-5[1m]` | Native Claude Code | Full-context neutral reviewer |
 | `fable-5-bounded` | Native Claude Code | Independent neutral researcher, verifier, or judge |
-| `gpt-5.6-high` | Codex | Implementation and first review |
+| `codex-sol-high` | Codex | Implementation and first review |
 | `gpt-5.6-sol` | Codex | Maximum-reasoning verification and adjudication |
-| `gpt-5.6-research` | Codex | Bounded research and source synthesis |
+| `codex-sol-medium` | Codex | Bounded research and source synthesis |
+
+`codex-sol-medium` and `codex-sol-high` are Orchestrator profile IDs, not
+provider model IDs. They and `gpt-5.6-sol` all invoke the actual
+`gpt-5.6-sol` model with `medium`, `high`, and `xhigh` reasoning respectively.
+The current local Codex registry reports a 272,000-token model context window;
+Orchestrator records that provider value rather than advertising a logical
+profile as a separate model.
 
 `config/models.json` is the sole active route catalog. A route that is absent
 from that file cannot be selected by the composer, Fugu router, or native
@@ -31,7 +47,7 @@ For a reverse-engineering and security-research task, policy currently favors:
 | Researcher | `opus-5-bounded` |
 | Hypothesis generator | `opus-5-bounded` |
 | Exploit analyst | `opus-5-bounded` |
-| Engineer | `gpt-5.6-high` |
+| Engineer | `codex-sol-high` |
 | Verifier | `opus-5-bounded` |
 | Judge | `gpt-5.6-sol` |
 

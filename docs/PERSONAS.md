@@ -8,9 +8,9 @@ and judge its own claims.
 | Persona | Primary job | Default route | Main failure checked by others |
 | --- | --- | --- | --- |
 | Researcher | Build primary evidence and identify missing artifacts | `opus-5-bounded` | Source dumping without a falsifiable conclusion |
-| Bullshitter | Generate unusual, high-upside hypotheses | `opus-5-bounded` | Imagination presented as observation |
+| Challenger | Generate unusual, high-upside hypotheses | `opus-5-bounded` | Imagination presented as observation |
 | Exploiter | Develop authorized, preconditioned security analysis | `opus-5-bounded` | Plausible primitives presented as demonstrated chains |
-| Engineer | Turn claims into small experiments, tooling, or fixes | `gpt-5.6-high` | Implementation confidence without repository or test evidence |
+| Engineer | Turn claims into small experiments, tooling, or fixes | `codex-sol-high` | Implementation confidence without repository or test evidence |
 | Verifier | Falsify claims and interpret machine results | `fable-5-bounded` | Treating a passing check as proof of more than it covers |
 | Judge | Resolve claims based on evidence, not consensus | `gpt-5.6-sol` | Rewarding verbosity, confidence, or circular peer citation |
 

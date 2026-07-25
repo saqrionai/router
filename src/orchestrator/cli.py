@@ -4,9 +4,11 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 from orchestrator import __version__
+from orchestrator.beads import resolve_bd_binary
 from orchestrator.composer import TeamComposer
 from orchestrator.config import AppConfig
 from orchestrator.evaluation import evaluate_run
@@ -177,8 +179,10 @@ def main(argv: list[str] | None = None) -> None:
             models=config.models,
             personas=config.personas,
             policy=config.team_policy,
+            use_behavioral_priors=config.team_policy.routing_mode == "active",
         ).compose(config.workflow(args.workflow), args.task)
         payload = {
+            "routing_mode": config.team_policy.routing_mode,
             "total_score": plan.total_score,
             "unique_models": plan.unique_models,
             "unique_families": plan.unique_families,
@@ -200,6 +204,7 @@ def main(argv: list[str] | None = None) -> None:
             print(json.dumps(payload, indent=2))
         else:
             print(
+                f"routing={config.team_policy.routing_mode} "
                 f"team score={plan.total_score:.3f} "
                 f"diversity={plan.unique_models} models/{plan.unique_families} families"
             )
@@ -272,6 +277,27 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{command:10} {'ok ' + location if location else 'missing'}")
         wrapper = shutil.which("codex-subagent")
         print(f"{'codex-subagent':14} {'ok ' + wrapper if wrapper else 'missing'}")
+        bd_binary = resolve_bd_binary()
+        if bd_binary:
+            completed = subprocess.run(
+                [bd_binary, "--version"],
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+            version = (completed.stdout or completed.stderr).strip() or "unknown version"
+            print(f"{'bd':10} ok {bd_binary} ({version})")
+        else:
+            print(f"{'bd':10} missing")
+        profile_warnings = config.profile_source_warnings()
+        if profile_warnings:
+            print(f"profiles:  warning ({len(profile_warnings)})")
+            for warning in profile_warnings:
+                print(f"  {warning}")
+        else:
+            print("profiles:  ok")
+        print(f"routing:   {config.team_policy.routing_mode}")
         print("scheduler: claude-native-workflows only")
 
 if __name__ == "__main__":

@@ -53,9 +53,13 @@ function excerpt(value, limit = 18000) {
     : `${rendered.slice(0, limit)}\n[truncated by workflow]`
 }
 
+function isCodexRoute(model) {
+  return model === 'gpt-5.6-sol' || model.startsWith('codex-sol-')
+}
+
 function agentTypeForModel(model) {
   if (model.startsWith('fable-5')) return 'orchestrator:fable-neutral'
-  if (model.startsWith('gpt-5.6')) return 'orchestrator:codex-worker'
+  if (isCodexRoute(model)) return 'orchestrator:codex-worker'
   if (model.startsWith('opus-4.8')) return 'orchestrator:opus-48-recovery'
   return 'orchestrator:opus-worker'
 }
@@ -68,19 +72,19 @@ function routes(persona, preferredFamily) {
       ? selected.fallback_order.map(String)
       : []),
     'opus-5-bounded',
-    'gpt-5.6-high',
+    'codex-sol-high',
     'gpt-5.6-sol',
     'opus-4.8-bounded',
   ]))
   const eligible = candidates.filter(model => !model.startsWith('fable-5'))
   const preferred = eligible.filter(model => (
     preferredFamily === 'openai'
-      ? model.startsWith('gpt-5.6')
-      : !model.startsWith('gpt-5.6')
+      ? isCodexRoute(model)
+      : !isCodexRoute(model)
   ))
   if (preferredFamily === 'openai') {
     preferred.sort((left, right) => (
-      Number(right === 'gpt-5.6-high') - Number(left === 'gpt-5.6-high')
+      Number(right === 'codex-sol-high') - Number(left === 'codex-sol-high')
     ))
   }
   const remainder = eligible.filter(model => !preferred.includes(model))

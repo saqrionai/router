@@ -6,7 +6,7 @@ isolation, resumption, and its workflow, agent, and task interfaces.
 Orchestrator contributes:
 
 - six evidence-oriented personas;
-- learned model/persona routing;
+- shadow-observed model/persona routing with explicit promotion;
 - bounded OpenAI delegation through the real Codex CLI;
 - heartbeat-aware supervision for process-backed model adapters;
 - an explicit in-run work queue;
@@ -16,6 +16,13 @@ Orchestrator contributes:
 - structural UltraCheck gates;
 - serialized Beads intake and result checkpoints; and
 - normalized native lifecycle and tool telemetry.
+
+This repository is Saqrion's internal engineering harness. It is not the
+customer-facing sovereign inference plane and must not transport sovereign
+customer prompts through personal Claude Code or Codex subscriptions. A
+customer inference plane has separate requirements for in-region model
+serving, tenant isolation, residency enforcement, quotas, billing attribution,
+and health/SLA-aware failover.
 
 There is one execution plane:
 
@@ -123,7 +130,7 @@ The active catalog intentionally contains only:
 
 - Opus 5 full-context and bounded routes;
 - Fable 5 full-context and bounded neutral-review routes; and
-- GPT-5.6 research, high, and Sol routes through Codex; plus
+- GPT-5.6 Sol at medium, high, and xhigh effort through Codex; plus
 - Opus 4.8 as a native recovery-only route.
 
 The Anthropic subscription carries high-volume work. GPT routes are used where

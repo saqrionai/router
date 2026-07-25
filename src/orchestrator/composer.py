@@ -24,11 +24,13 @@ class TeamComposer:
         personas: dict[str, Persona],
         policy: TeamPolicy,
         route_adjustments: dict[tuple[str, str], float] | None = None,
+        use_behavioral_priors: bool = True,
     ):
         self.models = models
         self.personas = personas
         self.policy = policy
         self.route_adjustments = route_adjustments or {}
+        self.use_behavioral_priors = use_behavioral_priors
 
     def compose(self, workflow: Workflow, task: str = "") -> TeamPlan:
         persona_ids = self._workflow_personas(workflow)
@@ -150,9 +152,10 @@ class TeamComposer:
             + self.route_adjustments.get((persona.id, model.id), 0.0)
         )
 
-    @staticmethod
-    def _effective_trait(model: ModelRoute, trait: str) -> float:
+    def _effective_trait(self, model: ModelRoute, trait: str) -> float:
         """Shrink uncertain behavioral priors toward a neutral score."""
+        if not self.use_behavioral_priors:
+            return 0.5
         raw = model.traits.get(trait, 0.5)
         return 0.5 + model.profile_confidence * (raw - 0.5)
 

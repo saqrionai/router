@@ -11,8 +11,8 @@ class FuguRouterTests(unittest.TestCase):
         self.config = AppConfig.load()
         self.pool = (
             "opus-5-bounded",
-            "gpt-5.6-high",
-            "gpt-5.6-research",
+            "codex-sol-high",
+            "codex-sol-medium",
         )
 
     def test_distribution_is_normalized_and_deterministic(self) -> None:
@@ -50,7 +50,7 @@ class FuguRouterTests(unittest.TestCase):
         outcomes = [
             {
                 "persona": "engineer",
-                "model": "gpt-5.6-research",
+                "model": "codex-sol-medium",
                 "calls": 20,
                 "format_successes": 20,
                 "terminal_calls": 20,
@@ -58,7 +58,7 @@ class FuguRouterTests(unittest.TestCase):
             },
             {
                 "persona": "engineer",
-                "model": "gpt-5.6-high",
+                "model": "codex-sol-high",
                 "calls": 20,
                 "format_successes": 20,
                 "terminal_calls": 20,
@@ -83,12 +83,12 @@ class FuguRouterTests(unittest.TestCase):
             candidate.model: candidate.probability for candidate in calibrated
         }
         self.assertGreater(
-            calibrated_probability["gpt-5.6-research"],
-            baseline_probability["gpt-5.6-research"],
+            calibrated_probability["codex-sol-medium"],
+            baseline_probability["codex-sol-medium"],
         )
         self.assertLess(
-            calibrated_probability["gpt-5.6-high"],
-            baseline_probability["gpt-5.6-high"],
+            calibrated_probability["codex-sol-high"],
+            baseline_probability["codex-sol-high"],
         )
 
     def test_duplicate_pool_is_rejected(self) -> None:
@@ -102,7 +102,7 @@ class FuguRouterTests(unittest.TestCase):
             router.rank(
                 task="Implement a parser.",
                 persona_id="engineer",
-                model_ids=("gpt-5.6-high", "gpt-5.6-high"),
+                model_ids=("codex-sol-high", "codex-sol-high"),
             )
 
     def test_fable_is_excluded_from_security_tasks_after_native_fallback(self) -> None:
@@ -111,7 +111,7 @@ class FuguRouterTests(unittest.TestCase):
             personas=self.config.personas,
             policy=self.config.team_policy,
         )
-        pool = ("fable-5-bounded", "opus-5-bounded", "gpt-5.6-high")
+        pool = ("fable-5-bounded", "opus-5-bounded", "codex-sol-high")
 
         exploiter = router.rank(
             task="Analyze an authorized firmware exploit.",
@@ -136,7 +136,7 @@ class FuguRouterTests(unittest.TestCase):
                 outcomes=[
                     {
                         "persona": "engineer",
-                        "model": "gpt-5.6-high",
+                        "model": "codex-sol-high",
                         "calls": 1,
                         "format_successes": 1,
                         "terminal_calls": 0,
@@ -189,7 +189,7 @@ class FuguRouterTests(unittest.TestCase):
                         "round": 1,
                         "task": "Implement and debug a binary protocol parser",
                         "persona": "engineer",
-                        "model": "gpt-5.6-research",
+                        "model": "codex-sol-medium",
                         "reward": 1.0,
                     },
                     {
@@ -197,7 +197,7 @@ class FuguRouterTests(unittest.TestCase):
                         "round": 1,
                         "task": "Implement and debug a binary protocol parser",
                         "persona": "engineer",
-                        "model": "gpt-5.6-high",
+                        "model": "codex-sol-high",
                         "reward": 0.0,
                     },
                 ]
@@ -216,11 +216,11 @@ class FuguRouterTests(unittest.TestCase):
         by_model = {candidate.model: candidate for candidate in candidates}
 
         self.assertGreater(
-            by_model["gpt-5.6-research"].contextual_success,
-            by_model["gpt-5.6-high"].contextual_success,
+            by_model["codex-sol-medium"].contextual_success,
+            by_model["codex-sol-high"].contextual_success,
         )
         self.assertEqual(
-            by_model["gpt-5.6-research"].contextual_observations,
+            by_model["codex-sol-medium"].contextual_observations,
             20,
         )
         self.assertEqual(
@@ -242,7 +242,7 @@ class FuguRouterTests(unittest.TestCase):
                     {
                         "task": "Implement a parser.",
                         "persona": "engineer",
-                        "model": "gpt-5.6-high",
+                        "model": "codex-sol-high",
                         "reward": 2.0,
                     }
                 ],

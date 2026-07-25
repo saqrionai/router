@@ -51,8 +51,8 @@ task whose authorization forbids edits. Use `workspace-write` only for an
 engineer assignment that requires implementation. Select reasoning effort from
 the routed model:
 
-- `gpt-5.6-research`: `medium`
-- `gpt-5.6-high`: `high`
+- `codex-sol-medium`: `medium`
+- `codex-sol-high`: `high`
 - `gpt-5.6-sol`: `xhigh`
 
 Pass the complete dispatch to Codex, including authorization boundaries,

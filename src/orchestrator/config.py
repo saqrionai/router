@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,7 @@ from orchestrator.domain import ModelRoute, Persona, Scope, Stage, TeamPolicy, W
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROFILE_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 
 
 def _default_root() -> Path:
@@ -116,6 +119,10 @@ class AppConfig:
                 (str(pair[0]), str(pair[1]))
                 for pair in policy_raw.get("independence_pairs") or ()
             ),
+            routing_mode=str(policy_raw.get("routing_mode") or "shadow"),
+            profile_stale_after_days=int(
+                policy_raw.get("profile_stale_after_days", 30)
+            ),
             task_signals={
                 str(keyword): {
                     str(trait): float(value) for trait, value in boosts.items()
@@ -167,6 +174,12 @@ class AppConfig:
         return config
 
     def validate(self) -> None:
+        if self.team_policy.routing_mode not in {"shadow", "active"}:
+            raise ValueError("team policy routing_mode must be shadow or active")
+        if self.team_policy.profile_stale_after_days < 1:
+            raise ValueError(
+                "team policy profile_stale_after_days must be positive"
+            )
         for persona in self.personas.values():
             missing = [model for model in persona.preferred_models if model not in self.models]
             if missing:
@@ -217,6 +230,35 @@ class AppConfig:
                         f"stage {stage.id!r} references unknown dependencies: "
                         f"{missing_dependencies}"
                     )
+
+    def profile_source_warnings(
+        self,
+        *,
+        today: date | None = None,
+    ) -> tuple[str, ...]:
+        today = today or date.today()
+        warnings: list[str] = []
+        for model in self.models.values():
+            matches = PROFILE_DATE.findall(model.profile_source)
+            if not matches:
+                warnings.append(
+                    f"{model.id}: profile source is undated "
+                    f"({model.profile_source})"
+                )
+                continue
+            observed = date.fromisoformat(matches[-1])
+            age = (today - observed).days
+            if age < 0:
+                warnings.append(
+                    f"{model.id}: profile source date is in the future "
+                    f"({observed.isoformat()})"
+                )
+            elif age > self.team_policy.profile_stale_after_days:
+                warnings.append(
+                    f"{model.id}: profile source is stale ({age} days, "
+                    f"{observed.isoformat()})"
+                )
+        return tuple(warnings)
 
     def workflow(self, workflow_id: str) -> Workflow:
         try:

@@ -29,9 +29,9 @@ class ComposerTests(unittest.TestCase):
         self.assertEqual(plan.unique_models, 3)
         self.assertEqual(plan.unique_families, 2)
         self.assertEqual(selected["researcher"], "opus-5-bounded")
-        self.assertEqual(selected["bullshitter"], "opus-5-bounded")
+        self.assertEqual(selected["challenger"], "opus-5-bounded")
         self.assertEqual(selected["exploiter"], "opus-5-bounded")
-        self.assertEqual(selected["engineer"], "gpt-5.6-high")
+        self.assertEqual(selected["engineer"], "codex-sol-high")
         self.assertEqual(selected["verifier"], "opus-5-bounded")
         self.assertEqual(selected["judge"], "gpt-5.6-sol")
         self.assertNotEqual(
@@ -42,7 +42,7 @@ class ComposerTests(unittest.TestCase):
             self.config.models[selected["exploiter"]].family,
             self.config.models[selected["judge"]].family,
         )
-        for persona_id in ("bullshitter", "exploiter", "engineer"):
+        for persona_id in ("challenger", "exploiter", "engineer"):
             assignment = plan.assignment_for(persona_id)
             self.assertNotIn("fable-5-bounded", assignment.fallback_order)
         for assignment in plan.assignments:
@@ -107,6 +107,21 @@ class ComposerTests(unittest.TestCase):
         self.assertGreater(raw, effective)
         self.assertGreater(effective, 0.5)
 
+    def test_shadow_mode_neutralizes_behavioral_profile_traits(self) -> None:
+        composer = TeamComposer(
+            models=self.config.models,
+            personas=self.config.personas,
+            policy=self.config.team_policy,
+            use_behavioral_priors=False,
+        )
+
+        effective = composer._effective_trait(
+            self.config.models["opus-5-bounded"],
+            "research",
+        )
+
+        self.assertEqual(effective, 0.5)
+
     def test_applies_learned_route_adjustments(self) -> None:
         baseline = self.composer.compose(
             self.workflow, "research and verify a codebase"
@@ -115,7 +130,7 @@ class ComposerTests(unittest.TestCase):
             models=self.config.models,
             personas=self.config.personas,
             policy=self.config.team_policy,
-            route_adjustments={("researcher", "gpt-5.6-research"): 10.0},
+            route_adjustments={("researcher", "codex-sol-medium"): 10.0},
         ).compose(self.workflow, "research and verify a codebase")
 
         baseline_models = {
@@ -127,7 +142,7 @@ class ComposerTests(unittest.TestCase):
             for assignment in adjusted.assignments
         }
         self.assertEqual(
-            adjusted_models["researcher"], "gpt-5.6-research"
+            adjusted_models["researcher"], "codex-sol-medium"
         )
         self.assertNotEqual(
             adjusted_models["researcher"], baseline_models["researcher"]

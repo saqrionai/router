@@ -1,36 +1,21 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from orchestrator.beads import BeadsBridge, BeadsError
+from orchestrator.beads import BeadsBridge, BeadsError, resolve_bd_binary
 from orchestrator.config import AppConfig
 from orchestrator.mcp_server import FuguMcpServer
 from orchestrator.store import StateStore
 
 
-def bd_binary() -> str | None:
-    configured = os.environ.get("ORCHESTRATOR_BD_BIN", "").strip()
-    if configured:
-        return configured
-    for candidate in (
-        Path("/opt/homebrew/bin/bd"),
-        Path("/usr/local/bin/bd"),
-    ):
-        if candidate.is_file():
-            return str(candidate)
-    return shutil.which("bd")
-
-
 def run(workspace: Path, *argv: str) -> str:
     command = list(argv)
     if command and command[0] == "bd":
-        command[0] = bd_binary() or "bd"
+        command[0] = resolve_bd_binary() or "bd"
     completed = subprocess.run(
         command,
         cwd=workspace,
@@ -41,7 +26,7 @@ def run(workspace: Path, *argv: str) -> str:
     return completed.stdout.strip()
 
 
-@pytest.mark.skipif(bd_binary() is None, reason="bd is not installed")
+@pytest.mark.skipif(resolve_bd_binary() is None, reason="bd is not installed")
 def test_auto_selection_resumes_work_and_skips_live_lease(
     tmp_path: Path,
 ) -> None:

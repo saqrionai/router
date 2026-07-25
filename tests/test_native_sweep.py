@@ -57,8 +57,8 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert r".replace(/^\d+[.)]\s+/, '')" in final
     assert "CRITERION[${index}]=${JSON.stringify(item)}" in final
     assert "candidates.filter(model => !model.startsWith('fable-5'))" in final
-    assert "'gpt-5.6-high'," in final
-    assert "right === 'gpt-5.6-high'" in final
+    assert "'codex-sol-high'," in final
+    assert "right === 'codex-sol-high'" in final
     assert "'openai'," in final
     assert "'anthropic'," in final
     assert "Workflow(orchestrator:fugu-sweep)" in skill
@@ -245,7 +245,7 @@ def test_plan_validator_rejects_cycles_escapes_and_parallel_overlap() -> None:
     ]
     script = (
         "const maxUnits = 64;\n"
-        "const personas = new Set(['researcher','bullshitter','exploiter',"
+        "const personas = new Set(['researcher','challenger','exploiter',"
         "'engineer','verifier','judge']);\n"
         "const risks = new Set(['low','medium','high','critical']);\n"
         "const kinds = new Set(['research','implementation','test','artifact']);\n"
@@ -289,13 +289,15 @@ def test_risk_policy_is_deterministic_and_escalates_high_risk() -> None:
 
 def test_writing_owner_routes_remove_fable_and_keep_read_only_fable() -> None:
     source = SWEEP.read_text(encoding="utf-8")
-    start = source.index("function ownerRoutes")
-    end = source.index("phase('Plan')")
-    helper = source[start:end]
+    codex_start = source.index("function isCodexRoute")
+    codex_end = source.index("function agentTypeForModel")
+    owner_start = source.index("function ownerRoutes")
+    owner_end = source.index("function parsePlannerOutput")
+    helper = source[codex_start:codex_end] + source[owner_start:owner_end]
     script = (
         "function routes(persona) {\n"
         "  if (persona === 'verifier') return ['fable-5-bounded'];\n"
-        "  return ['gpt-5.6-high', 'opus-5-bounded'];\n"
+        "  return ['codex-sol-high', 'opus-5-bounded'];\n"
         "}\n"
         f"{helper}\n"
         "const writing = ownerRoutes({writes:true,persona:'verifier'}, 1);\n"

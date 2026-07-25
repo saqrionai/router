@@ -36,6 +36,7 @@ def test_route_team_maps_models_to_native_agent_types(tmp_path: Path) -> None:
     }
     assert payload["workflow_run_id"].startswith("native-")
     assert payload["execution_plane"] == "claude-native-workflow"
+    assert payload["routing_mode"] == "shadow"
     assert assignments["researcher"]["agent_type"] == "orchestrator:opus-worker"
     for assignment in assignments.values():
         assert assignment["model"] != "opus-4.8-bounded"
@@ -43,6 +44,7 @@ def test_route_team_maps_models_to_native_agent_types(tmp_path: Path) -> None:
     assert assignments["engineer"]["agent_type"] == "orchestrator:codex-worker"
     assert assignments["verifier"]["agent_type"] == "orchestrator:opus-worker"
     assert assignments["researcher"]["routing_distribution"]
+    assert assignments["researcher"]["shadow_recommendation"]
 
 
 def test_security_workflow_excludes_fable_for_neutral_task_text(

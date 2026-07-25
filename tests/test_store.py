@@ -24,7 +24,7 @@ class StoreTests(unittest.TestCase):
                 ),
             )
             for round_number, model, decision in (
-                (1, "gpt-5.6-high", "revise"),
+                (1, "codex-sol-high", "revise"),
                 (2, "opus-5-bounded", "accept"),
             ):
                 store.event(
@@ -58,8 +58,8 @@ class StoreTests(unittest.TestCase):
                 row["model"]: row for row in store.routing_outcomes()
             }
 
-            self.assertEqual(outcomes["gpt-5.6-high"]["terminal_calls"], 1)
-            self.assertEqual(outcomes["gpt-5.6-high"]["accepted_calls"], 0)
+            self.assertEqual(outcomes["codex-sol-high"]["terminal_calls"], 1)
+            self.assertEqual(outcomes["codex-sol-high"]["accepted_calls"], 0)
             self.assertEqual(outcomes["opus-5-bounded"]["terminal_calls"], 1)
             self.assertEqual(outcomes["opus-5-bounded"]["accepted_calls"], 1)
 
@@ -67,10 +67,10 @@ class StoreTests(unittest.TestCase):
                 row["model"]: row for row in store.routing_observations()
             }
             self.assertEqual(
-                observations["gpt-5.6-high"]["task"],
+                observations["codex-sol-high"]["task"],
                 "Review a router.",
             )
-            self.assertEqual(observations["gpt-5.6-high"]["reward"], 0.5)
+            self.assertEqual(observations["codex-sol-high"]["reward"], 0.5)
             self.assertEqual(observations["opus-5-bounded"]["reward"], 1.0)
 
     def test_native_queue_outcomes_are_idempotent_and_train_router(self) -> None:
@@ -81,7 +81,7 @@ class StoreTests(unittest.TestCase):
                     "id": "unit-1",
                     "round": 1,
                     "persona": "engineer",
-                    "model": "gpt-5.6-high",
+                    "model": "codex-sol-high",
                     "status": "accepted",
                 },
                 {
@@ -113,7 +113,7 @@ class StoreTests(unittest.TestCase):
             outcomes = {
                 row["model"]: row for row in store.routing_outcomes()
             }
-            self.assertEqual(outcomes["gpt-5.6-high"]["accepted_calls"], 1)
+            self.assertEqual(outcomes["codex-sol-high"]["accepted_calls"], 1)
             self.assertEqual(
                 outcomes["fable-5-bounded"]["format_successes"],
                 1,
@@ -121,7 +121,7 @@ class StoreTests(unittest.TestCase):
             observations = {
                 row["model"]: row for row in store.routing_observations()
             }
-            self.assertEqual(observations["gpt-5.6-high"]["reward"], 1.0)
+            self.assertEqual(observations["codex-sol-high"]["reward"], 1.0)
             self.assertEqual(observations["fable-5-bounded"]["reward"], 0.0)
 
     def test_native_recovery_attempts_train_degraded_primary_as_failure(self) -> None:

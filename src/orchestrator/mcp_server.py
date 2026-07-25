@@ -191,6 +191,7 @@ class FuguMcpServer:
             )
             distributions: dict[str, list[dict[str, Any]]] = {}
             route_adjustments: dict[tuple[str, str], float] = {}
+            shadow_mode = self.config.team_policy.routing_mode == "shadow"
             for persona_id in persona_ids:
                 persona = self.config.personas[persona_id]
                 primary_models = tuple(
@@ -206,17 +207,19 @@ class FuguMcpServer:
                 distributions[persona_id] = [
                     candidate.as_dict() for candidate in candidates
                 ]
-                for candidate in candidates:
-                    route_adjustments[(persona_id, candidate.model)] = (
-                        0.20 * (candidate.contextual_success - 0.5)
-                        + 0.10 * (candidate.terminal_success - 0.5)
-                        + 0.05 * (candidate.format_success - 0.5)
-                    )
+                if not shadow_mode:
+                    for candidate in candidates:
+                        route_adjustments[(persona_id, candidate.model)] = (
+                            0.20 * (candidate.contextual_success - 0.5)
+                            + 0.10 * (candidate.terminal_success - 0.5)
+                            + 0.05 * (candidate.format_success - 0.5)
+                        )
             plan = TeamComposer(
                 models=self.config.models,
                 personas=self.config.personas,
                 policy=self.config.team_policy,
                 route_adjustments=route_adjustments,
+                use_behavioral_priors=not shadow_mode,
             ).compose(workflow, task)
             assignments = []
             for assignment in plan.assignments:
@@ -238,6 +241,11 @@ class FuguMcpServer:
                         "routing_distribution": distributions[
                             assignment.persona
                         ],
+                        "shadow_recommendation": (
+                            distributions[assignment.persona][0]["model"]
+                            if shadow_mode
+                            else None
+                        ),
                     }
                 )
             return {
@@ -249,6 +257,7 @@ class FuguMcpServer:
                 "unique_families": plan.unique_families,
                 "task_traits": plan.task_traits,
                 "assignments": assignments,
+                "routing_mode": self.config.team_policy.routing_mode,
                 "execution_plane": "claude-native-workflow",
             }
         if name == "route_persona":

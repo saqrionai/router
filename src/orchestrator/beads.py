@@ -4,6 +4,7 @@ import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from contextlib import contextmanager
@@ -14,6 +15,20 @@ from typing import Any, Iterator, TextIO
 
 class BeadsError(RuntimeError):
     pass
+
+
+def resolve_bd_binary() -> str | None:
+    """Resolve one stable Beads executable for setup and runtime calls."""
+    configured = os.environ.get("ORCHESTRATOR_BD_BIN", "").strip()
+    if configured:
+        return str(Path(configured).expanduser())
+    for candidate in (
+        Path("/opt/homebrew/bin/bd"),
+        Path("/usr/local/bin/bd"),
+    ):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return shutil.which("bd")
 
 
 class BeadsBridge:
@@ -504,9 +519,8 @@ class BeadsBridge:
         workspace: Path, argv: list[str]
     ) -> subprocess.CompletedProcess[str]:
         command = list(argv)
-        configured_bd = os.environ.get("ORCHESTRATOR_BD_BIN", "").strip()
-        if command and command[0] == "bd" and configured_bd:
-            command[0] = configured_bd
+        if command and command[0] == "bd":
+            command[0] = resolve_bd_binary() or "bd"
         for attempt in range(5):
             try:
                 completed = subprocess.run(

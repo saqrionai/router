@@ -53,7 +53,7 @@ const integrationChecks = Array.isArray(input.integrationChecks)
 
 const personas = new Set([
   'researcher',
-  'bullshitter',
+  'challenger',
   'exploiter',
   'engineer',
   'verifier',
@@ -226,9 +226,13 @@ function verificationCount(unit, cohortFirst) {
     : 0
 }
 
+function isCodexRoute(model) {
+  return model === 'gpt-5.6-sol' || model.startsWith('codex-sol-')
+}
+
 function agentTypeForModel(model) {
   if (model.startsWith('fable-5')) return 'orchestrator:fable-neutral'
-  if (model.startsWith('gpt-5.6')) return 'orchestrator:codex-worker'
+  if (isCodexRoute(model)) return 'orchestrator:codex-worker'
   if (model.startsWith('opus-4.8')) return 'orchestrator:opus-48-recovery'
   return 'orchestrator:opus-worker'
 }
@@ -252,7 +256,7 @@ function ownerRoutes(unit, writingOrdinal) {
   if (unit.writes && !selected.length) selected.push('opus-5-bounded')
   if (
     !unit.writes
-    || !selected[0].startsWith('gpt-5.6')
+    || !isCodexRoute(selected[0])
     || writingOrdinal % 4 === 1
   ) {
     return selected
@@ -320,7 +324,7 @@ dependency whenever units overlap or consume another unit's result. Assign the
 best owner persona. Fable may own read-only neutral research but can never own
 a writing unit; every writing persona must have an Opus 5 or GPT-5.6 route.
 Return only one JSON object with this exact shape and no Markdown fence:
-{"status":"completed|blocked","summary":"...","baseSha":"git object id","repoClean":true,"units":[{"id":"lowercase-id","title":"...","objective":"...","kind":"research|implementation|test|artifact","writes":true,"risk":"low|medium|high|critical","resource":"light|medium|heavy","persona":"researcher|bullshitter|exploiter|engineer|verifier","paths":["relative/path/**"],"dependsOn":[],"acceptanceCriteria":["..."],"checks":["..."]}]}
+{"status":"completed|blocked","summary":"...","baseSha":"git object id","repoClean":true,"units":[{"id":"lowercase-id","title":"...","objective":"...","kind":"research|implementation|test|artifact","writes":true,"risk":"low|medium|high|critical","resource":"light|medium|heavy","persona":"researcher|challenger|exploiter|engineer|verifier","paths":["relative/path/**"],"dependsOn":[],"acceptanceCriteria":["..."],"checks":["..."]}]}
 Do not emit persona-review units or units whose only
 purpose is to rerun project-wide integration checks; the parent runs these
 after merge:

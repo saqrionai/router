@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from orchestrator.beads import BeadsBridge
+from orchestrator.beads import BeadsBridge, resolve_bd_binary
 
 
 class BeadsBridgeTests(unittest.TestCase):
@@ -94,17 +94,27 @@ class BeadsBridgeTests(unittest.TestCase):
         self.assertNotIn("private_field", snapshot)
         self.assertEqual(run.call_args.kwargs["cwd"], Path("/tmp/project"))
 
-    @patch.dict(os.environ, {"ORCHESTRATOR_BD_BIN": ""})
+    @patch(
+        "orchestrator.beads.resolve_bd_binary",
+        return_value="/opt/homebrew/bin/bd",
+    )
     @patch("orchestrator.beads.subprocess.run")
-    def test_comment_is_append_only(self, run) -> None:
+    def test_comment_is_append_only(self, run, resolve) -> None:
         run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
 
         BeadsBridge().comment(Path("/tmp/project"), "ios-123", "run summary")
 
         self.assertEqual(
             run.call_args.args[0],
-            ["bd", "comments", "add", "ios-123", "run summary"],
+            [
+                "/opt/homebrew/bin/bd",
+                "comments",
+                "add",
+                "ios-123",
+                "run summary",
+            ],
         )
+        resolve.assert_called_once_with()
 
     @patch.dict(
         os.environ,
@@ -125,4 +135,14 @@ class BeadsBridgeTests(unittest.TestCase):
                 "ios-123",
                 "run summary",
             ],
+        )
+
+    @patch.dict(
+        os.environ,
+        {"ORCHESTRATOR_BD_BIN": "~/bin/custom-bd"},
+    )
+    def test_resolver_expands_configured_binary(self) -> None:
+        self.assertEqual(
+            resolve_bd_binary(),
+            str(Path("~/bin/custom-bd").expanduser()),
         )

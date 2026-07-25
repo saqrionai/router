@@ -1,5 +1,19 @@
 # Architecture
 
+## Product Boundary
+
+Orchestrator is a single-operator internal engineering harness. Claude Code is
+allowed to own its native agents and Codex may be delegated bounded engineering
+units because this plane handles Saqrion's own development work.
+
+It is not Saqrion's sovereign customer inference plane. Customer workloads that
+promise regional or sovereign residency require a separate data plane that
+routes only to approved in-region GPU nodes and model containers, with
+tenant-isolated credentials and state, enforceable residency policy, quotas,
+usage attribution, provider/node health, and contractual failover behavior.
+This repository's queue, evidence, judgment, telemetry, and learning contracts
+may inform that product, but its Claude/Codex transports cannot serve it.
+
 ## One Native Execution Plane
 
 Claude Code is the sole execution plane. Saved dynamic workflows own forum

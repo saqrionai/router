@@ -309,7 +309,7 @@ const judgeSchema = {
 
 const personaPrompts = {
   researcher: 'Inventory primary evidence, prior work, relevant files, and missing artifacts. State exactly what each source supports and does not support.',
-  bullshitter: 'Generate high-upside competing hypotheses. Mark every novel assertion as a hypothesis and give a concrete falsification test. Never manufacture evidence.',
+  challenger: 'Generate high-upside competing hypotheses. Mark every novel assertion as a hypothesis and give a concrete falsification test. Never manufacture evidence.',
   exploiter: 'For the authorized target only, analyze reachable trust boundaries, primitives, preconditions, constraints, and failure points. Distinguish plausible from demonstrated.',
   engineer: 'Implement the smallest sound artifact or experiment that advances the task. Follow repository conventions and run real acceptance checks before claiming success.',
   verifier: 'Try to falsify the important claims using direct artifact inspection and reproducible machine checks. Explain what every check proves and does not prove.',
@@ -358,9 +358,13 @@ function queueSnapshot() {
   }))
 }
 
+function isCodexRoute(model) {
+  return model === 'gpt-5.6-sol' || model.startsWith('codex-sol-')
+}
+
 function agentTypeForModel(model) {
   if (model.startsWith('fable-5')) return 'orchestrator:fable-neutral'
-  if (model.startsWith('gpt-5.6')) return 'orchestrator:codex-worker'
+  if (isCodexRoute(model)) return 'orchestrator:codex-worker'
   if (model.startsWith('opus-4.8')) return 'orchestrator:opus-48-recovery'
   return 'orchestrator:opus-worker'
 }
@@ -469,7 +473,7 @@ function workerDegradationReasons(result, persona) {
   }
   if (
     result.status === 'completed'
-    && ['bullshitter', 'exploiter'].includes(persona)
+    && ['challenger', 'exploiter'].includes(persona)
     && claims.length === 0
   ) {
     reasons.push(`${persona} completed without claims or hypotheses`)
@@ -1136,7 +1140,7 @@ const opening = quick
       'Opening posts',
     ),
     () => dispatch(
-      'bullshitter',
+      'challenger',
       'Independently challenge the likely conclusions and identify evidence gaps or cheaper falsification tests without treating hypotheses as facts.',
       null,
       'Opening posts',

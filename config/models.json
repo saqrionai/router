@@ -179,7 +179,7 @@
       "backend": "codex-cli",
       "model": "gpt-5.6-sol",
       "family": "openai",
-      "context_window": 1050000,
+      "context_window": 272000,
       "reasoning_effort": "xhigh",
       "strengths": [
         "coding",
@@ -205,15 +205,15 @@
         "contrarianism": 0.55,
         "security_reasoning": 0.86
       },
-      "profile_source": "initial-local-prior",
+      "profile_source": "initial-local-prior-2026-07-25",
       "profile_confidence": 0.35
     },
     {
-      "id": "gpt-5.6-high",
+      "id": "codex-sol-high",
       "backend": "codex-cli",
       "model": "gpt-5.6-sol",
       "family": "openai",
-      "context_window": 1050000,
+      "context_window": 272000,
       "reasoning_effort": "high",
       "strengths": [
         "coding",
@@ -243,11 +243,11 @@
       "profile_confidence": 0.20
     },
     {
-      "id": "gpt-5.6-research",
+      "id": "codex-sol-medium",
       "backend": "codex-cli",
       "model": "gpt-5.6-sol",
       "family": "openai",
-      "context_window": 1050000,
+      "context_window": 272000,
       "reasoning_effort": "medium",
       "strengths": [
         "research-synthesis",

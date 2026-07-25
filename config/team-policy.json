@@ -1,4 +1,6 @@
 {
+  "routing_mode": "shadow",
+  "profile_stale_after_days": 30,
   "role_fit_weight": 1.0,
   "preference_weight": 0.10,
   "family_budget_bias": {
@@ -13,7 +15,7 @@
   "independence_family_penalty": 0.30,
   "independence_pairs": [
     ["researcher", "judge"],
-    ["bullshitter", "judge"],
+    ["challenger", "judge"],
     ["exploiter", "judge"],
     ["engineer", "verifier"],
     ["engineer", "judge"],

@@ -7,7 +7,7 @@
   "stages": [
     {
       "id": "routable-personas",
-      "personas": ["researcher", "bullshitter", "exploiter", "engineer", "verifier", "judge"]
+      "personas": ["researcher", "challenger", "exploiter", "engineer", "verifier", "judge"]
     }
   ]
 }
