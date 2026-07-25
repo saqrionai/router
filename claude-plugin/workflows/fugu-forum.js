@@ -37,8 +37,12 @@ const assignments = Array.isArray(input.assignments) ? input.assignments : []
 const tracking = input.tracking && typeof input.tracking === 'object'
   ? input.tracking
   : null
-const quick = Boolean(input.quick)
 const ultracheck = Boolean(input.ultracheck) || /\bultracheck\b/i.test(task)
+const fullForum = ultracheck
+  || Boolean(input.fullForum)
+  || /\bfull forum\b/i.test(task)
+const quick = !fullForum && Boolean(input.quick)
+const mode = quick ? 'quick' : fullForum ? 'full' : 'standard'
 const workflowRunId = String(input.workflowRunId || '').trim()
 if (!workflowRunId) {
   return {
@@ -46,10 +50,11 @@ if (!workflowRunId) {
     reason: 'fugu-forum requires args.workflowRunId from Fugu route_team',
   }
 }
-const defaultMaxRounds = quick ? 2 : 6
+const defaultMaxRounds = quick ? 1 : fullForum ? 3 : 2
+const maxRoundCeiling = defaultMaxRounds
 const maxRounds = Math.max(
   1,
-  Math.min(Number(input.maxRounds || defaultMaxRounds), quick ? 2 : 8),
+  Math.min(Number(input.maxRounds || defaultMaxRounds), maxRoundCeiling),
 )
 const noProgressLimit = Math.max(
   1,
@@ -1116,25 +1121,31 @@ claim. Progress booleans compare this round with the prior round.`, {
 }
 
 phase('Opening posts')
-const opening = await parallel([
-  () => dispatch(
+const opening = quick
+  ? [await dispatch(
     'researcher',
     'Build the evidence inventory before conclusions harden.',
     null,
     'Opening posts',
-  ),
-  () => dispatch(
-    'bullshitter',
-    'Independently challenge the likely conclusions and identify evidence gaps or cheaper falsification tests without treating hypotheses as facts.',
-    null,
-    'Opening posts',
-  ),
-])
+  )]
+  : await parallel([
+    () => dispatch(
+      'researcher',
+      'Build the evidence inventory before conclusions harden.',
+      null,
+      'Opening posts',
+    ),
+    () => dispatch(
+      'bullshitter',
+      'Independently challenge the likely conclusions and identify evidence gaps or cheaper falsification tests without treating hypotheses as facts.',
+      null,
+      'Opening posts',
+    ),
+  ])
 
 phase('Cross-examination')
-const cross = quick
-  ? []
-  : await parallel([
+const cross = fullForum
+  ? await parallel([
     () => dispatch(
       'exploiter',
       'Cross-examine the opening posts and produce a precise, scope-bounded technical analysis.',
@@ -1149,6 +1160,7 @@ const cross = quick
       '-opening',
     ),
   ])
+  : []
 
 phase('Artifact workshop')
 let artifact = await dispatch(
@@ -1160,24 +1172,33 @@ let artifact = await dispatch(
 
 async function verifyAndJudge(round, artifactValue) {
   phase('Verification')
-  const verification = await parallel([
-    () => dispatch(
+  const verification = quick
+    ? [await dispatch(
       'verifier',
       'Independently inspect the artifact and attempt to falsify every material completion claim.',
       { opening, cross, artifact: artifactValue },
       'Verification',
       `-artifact-r${round}`,
       round,
-    ),
-    () => dispatch(
-      'researcher',
-      'Check whether the artifact and citations cover the original evidence base without omissions or drift.',
-      { opening, cross, artifact: artifactValue },
-      'Verification',
-      `-coverage-r${round}`,
-      round,
-    ),
-  ])
+    )]
+    : await parallel([
+      () => dispatch(
+        'verifier',
+        'Independently inspect the artifact and attempt to falsify every material completion claim.',
+        { opening, cross, artifact: artifactValue },
+        'Verification',
+        `-artifact-r${round}`,
+        round,
+      ),
+      () => dispatch(
+        'researcher',
+        'Check whether the artifact and citations cover the original evidence base without omissions or drift.',
+        { opening, cross, artifact: artifactValue },
+        'Verification',
+        `-coverage-r${round}`,
+        round,
+      ),
+    ])
   const refutation = ultracheck
     ? await dispatch(
       'verifier',
@@ -1283,7 +1304,9 @@ for (const item of queue) {
 
 return {
   workflowRunId,
+  mode,
   quick,
+  fullForum,
   status: reviewed.judgment.decision === 'accept' ? 'accepted' : 'blocked',
   stopReason,
   rounds: round,

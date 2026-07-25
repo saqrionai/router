@@ -89,7 +89,9 @@ pausing, stopping, and resumption. Select an agent and press `x` to stop it or
 Native progress is saved by Claude Code.
 There is no local API worker, background dashboard scheduler, or LaunchAgent.
 
-The workflow defaults to six rounds, allows at most eight, and stops after two
+The standard workflow permits at most two rounds: the initial artifact and one
+evidence-backed revision. Quick mode permits one round. Explicit `full forum`
+and UltraCheck permit at most three rounds. Every mode stops after two
 consecutive no-progress revisions. A worker returning successfully only changes
 its queue unit to `returned`; it does not accept the task.
 
@@ -98,11 +100,12 @@ budget. Recovery agents use at most three substantive tool calls, may retry a
 no-signal machine check only once, and must keep a shell command's combined
 declared worst-case runtime below 90 seconds. A second no-signal result ends
 testing and returns a blocked or partial result instead of consuming another
-verification loop. For bounded tasks, ask for a `quick workflow`; it fans out
-two independent opening units, runs one artifact writer after that barrier,
-fans out two independent verification units, and then judges. It omits the
-separate cross-examination phase and defaults to two rounds. Use the full forum
-for ambiguous, adversarial, or broad work.
+verification loop. Standard mode is the default: two parallel opening units,
+one artifact writer, two parallel verification units, and one judge, with at
+most one revision. Ask for a `quick workflow` to use one opening unit, one
+writer, one verifier, one judge, and no revision. Ask for `full forum` only for
+ambiguous, adversarial, or broad work; it adds parallel cross-examination and
+allows at most two revisions.
 
 Process-backed model agents use
 `claude-plugin/bin/agent-supervisor`. It launches one durable process, records

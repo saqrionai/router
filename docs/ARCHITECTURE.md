@@ -23,19 +23,19 @@ agents.
 
 ## Native Queue
 
-The full forum uses:
+The standard forum is the default and uses:
 
 1. parallel researcher and hypothesis opening posts;
-2. parallel exploit analysis and adversarial cross-examination;
-3. one artifact worker;
-4. independent artifact verification and evidence-coverage review;
-5. an exact criterion-level judge; and
-6. bounded revision waves when the judge returns actionable blockers.
+2. one artifact worker;
+3. independent artifact verification and evidence-coverage review;
+4. an exact criterion-level judge; and
+5. at most one revision when the judge returns actionable blockers.
 
-Quick mode retains evidence, artifact, verification, and judgment while omitting
-the competing hypothesis and cross-examination phases. UltraCheck adds broad
-checks, a clean-process rerun, refutation hypotheses, hostile-input categories,
-and a claim-level evidence ledger.
+Quick mode uses one opening unit, one artifact worker, one verifier, and one
+judge with no revision. Explicit full mode adds parallel exploit analysis and
+adversarial cross-examination and permits at most two revisions. UltraCheck
+uses the full graph and adds broad checks, a clean-process rerun, refutation
+hypotheses, hostile-input categories, and a claim-level evidence ledger.
 
 Each queue unit records persona, logical route, native agent type, attempted
 fallbacks, per-attempt quality outcomes and reasons, status, round, and summary.

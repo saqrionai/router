@@ -12,11 +12,30 @@ its exact H1 with direct file evidence and independent criterion-level judgment.
 Do not edit files.
 ```
 
-Quick mode runs two independent opening agents in parallel, one artifact writer
-after that evidence barrier, and two independent verification agents in
-parallel before deterministic judgment. It omits the separate
-cross-examination phase. Use it for bounded checks where the full forum would
-add cost without materially improving the answer.
+Quick mode runs one evidence agent, one artifact writer, one verifier, and one
+judge, with no revision wave. Use it only for low-risk bounded checks.
+
+## Standard Forum
+
+```text
+/orchestrator:orchestrate Implement the parser change and independently verify
+the regression test and relevant suite.
+```
+
+Standard mode is the default. It runs two opening agents in parallel, one
+artifact writer after that evidence barrier, and two independent verification
+agents in parallel before judgment. One evidence-backed revision is allowed,
+for six calls normally and at most ten.
+
+## Full Forum
+
+```text
+/orchestrator:orchestrate full forum: investigate the contradictory crash
+evidence, implement the strongest fix, and adversarially verify it.
+```
+
+Full mode adds two parallel cross-examiners and permits at most two revision
+waves. Use it for ambiguous or high-stakes work, not routine continuation.
 
 ## Mixed Anthropic And OpenAI
 

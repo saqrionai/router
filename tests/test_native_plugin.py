@@ -13,16 +13,16 @@ ORCHESTRATE_SKILL = (
 )
 
 
-def test_quick_workflow_has_bounded_graph_and_queue_evidence() -> None:
+def test_workflow_modes_have_bounded_graph_and_queue_evidence() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "const quick = Boolean(input.quick)" in source
-    assert "quick ? 2 : 8" in source
-    assert "const cross = quick" in source
-    assert "const opening = await parallel([" in source
-    assert "const verification = await parallel([" in source
-    assert "const opening = quick" not in source
-    assert "const verification = quick" not in source
+    assert "const quick = !fullForum && Boolean(input.quick)" in source
+    assert "const fullForum = ultracheck" in source
+    assert "const mode = quick ? 'quick' : fullForum ? 'full' : 'standard'" in source
+    assert "quick ? 1 : fullForum ? 3 : 2" in source
+    assert "const cross = fullForum" in source
+    assert "const opening = quick" in source
+    assert "const verification = quick" in source
     assert "NATIVE QUEUE SNAPSHOT:" in source
     assert "${excerpt(queueSnapshot(), 12000)}" in source
 
@@ -53,8 +53,8 @@ def test_orchestrate_skill_defaults_to_automatic_bead_intake() -> None:
     assert "highest-priority `in_progress`" in source
     assert "`resolved_task`" in source
     assert "another live client skips that Bead" in source
-    assert "only when the user explicitly requests a quick" in source
-    assert "do not silently reduce the graph" in source
+    assert "`standard`: the default" in source
+    assert "Full mode additionally runs parallel cross-examination" in source
 
 
 def test_opus_48_is_a_quality_gated_native_recovery_route() -> None:

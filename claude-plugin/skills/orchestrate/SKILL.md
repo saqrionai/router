@@ -48,14 +48,18 @@ If the task is empty, ask for it. Otherwise:
    route plan.
 5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
-   Set `quick` to `true` only when the user explicitly requests a quick
-   workflow. Otherwise use the full forum; do not silently reduce the graph
-   based on an inferred task size. Quick mode still runs parallel opening and
-   verification units around one artifact writer and one judge.
+   Select one explicit execution mode:
+   - `quick`: only when the user explicitly requests a quick workflow;
+   - `full`: only when the task contains `full forum`; and
+   - `standard`: the default for every other orchestrated task.
+   Standard mode runs two parallel opening units, one artifact writer, two
+   parallel verification units, and one judge, with at most one revision.
+   Full mode additionally runs parallel cross-examination and allows at most
+   two revisions. If both quick and full are requested, full wins.
    If the task contains the exact word `ultracheck`, preserve it in `task` and
-   set `ultracheck` to `true`; the workflow will require a clean-process rerun,
-   broad project checks, at least five refutation hypotheses, and a claim-level
-   evidence ledger.
+   set `ultracheck` and `fullForum` to `true`; the workflow will require a
+   clean-process rerun, broad project checks, at least five refutation
+   hypotheses, and a claim-level evidence ledger.
 6. For security work, include the user's actual authorization and target
    boundary. If no authorization is present, restrict execution to analysis of
    local artifacts and defensive engineering.
@@ -71,13 +75,16 @@ If the task is empty, ask for it. Otherwise:
   "workflowRunId": "<workflow_run_id returned by route_team>",
   "tracking": "<prepare_bead result when enabled, otherwise null>",
   "quick": false,
+  "fullForum": false,
   "ultracheck": false,
-  "maxRounds": 6,
+  "maxRounds": 2,
   "noProgressLimit": 2
 }
 ```
 
-Use `maxRounds: 2` when `quick` is true. Use `maxRounds: 6` for the full forum.
+Use `maxRounds: 1` for quick, `2` for standard, and `3` for full or
+UltraCheck. The workflow enforces these ceilings even if a larger value is
+supplied.
 
 8. Tell the user the selected Bead and whether it was resumed, claimed, or
    created. The run is visible in `/workflows`. This is the only execution
