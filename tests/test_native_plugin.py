@@ -62,6 +62,19 @@ def test_opus_48_is_a_quality_gated_native_recovery_route() -> None:
     skill = ORCHESTRATE_SKILL.read_text(encoding="utf-8")
     assert "Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery" in skill
     assert "model: claude-opus-4-8" in agent
+    assert "maxTurns: 8" in agent
+    assert "at most three substantive tool calls" in agent
+
+
+def test_native_agents_stop_repeating_no_signal_checks() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    recovery = OPUS_48_AGENT.read_text(encoding="utf-8")
+
+    for source in (workflow, recovery):
+        assert "zero-signal" in source
+        assert "After a second no-signal result" in source.replace("\n", " ")
+        assert "below 90 seconds" in source
+    assert workflow.count("${executionBudget}") == 2
 
 
 def test_global_workflow_limits_are_rethrown_instead_of_routed() -> None:

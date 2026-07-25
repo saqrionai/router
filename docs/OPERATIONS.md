@@ -87,10 +87,14 @@ consecutive no-progress revisions. A worker returning successfully only changes
 its queue unit to `returned`; it does not accept the task.
 
 Each native agent also has a hard turn cap and a smaller substantive tool-call
-budget. For bounded tasks, ask for a `quick workflow`; it runs evidence,
-artifact, verification, and judgment units while omitting the competing
-hypothesis and cross-examination phases and defaults to two rounds. Use the full
-forum for ambiguous, adversarial, or broad work.
+budget. Recovery agents use at most three substantive tool calls, may retry a
+no-signal machine check only once, and must keep a shell command's combined
+declared worst-case runtime below 90 seconds. A second no-signal result ends
+testing and returns a blocked or partial result instead of consuming another
+verification loop. For bounded tasks, ask for a `quick workflow`; it runs
+evidence, artifact, verification, and judgment units while omitting the
+competing hypothesis and cross-examination phases and defaults to two rounds.
+Use the full forum for ambiguous, adversarial, or broad work.
 
 ## Beads Queue
 

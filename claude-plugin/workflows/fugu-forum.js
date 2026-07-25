@@ -691,6 +691,15 @@ function providerFailureReason(result) {
     .slice(0, 500)
 }
 
+const executionBudget = `EXECUTION BUDGET:
+- Before each tool call, identify the exact unresolved acceptance criterion it tests.
+- Do not retry a failed, timed-out, or zero-signal machine check more than once.
+- After a second no-signal result, stop testing and return the strongest supported
+  result, marking unresolved claims blocked with the smallest next action.
+- Keep any shell command's combined declared worst-case runtime below 90 seconds.
+- Existing direct evidence may be reused only after independently inspecting it;
+  do not rerun an expensive check merely to reproduce already-corroborated evidence.`
+
 async function dispatch(
   persona,
   objective,
@@ -732,6 +741,8 @@ VERIFICATION MODE:
 ${ultracheck
   ? 'ULTRACHECK: broad checks, clean rerun, hostile inputs, refutation hypotheses, and a claim-level evidence ledger are mandatory.'
   : 'Normal evidence-gated verification.'}
+
+${executionBudget}
 
 OBJECTIVE:
 ${objective}
@@ -1022,6 +1033,8 @@ ${excerpt(evidence, 32000)}
 
 NATIVE QUEUE SNAPSHOT:
 ${excerpt(queueSnapshot(), 12000)}
+
+${executionBudget}
 
 Return one criteria row for every criterion, in the same order and with the
 exact criterion text. A worker returning, editing a file, or exiting zero does
