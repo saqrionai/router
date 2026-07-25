@@ -352,11 +352,13 @@ Inspect the repository, current HEAD, status, project instructions, existing
 work, and real test commands. Do not edit. Emit at most ${maxUnits} independently
 reviewable, semantically distinct units in a dependency DAG. Deduplicate units
 that would produce the same artifact or test the same claim. Set writes=true
-only when the unit changes files. Writing units need disjoint concurrent path
-scopes and real checks. Add a dependency whenever units overlap or consume
-another unit's result. Assign the best owner persona. Do not emit persona-review
-units or units whose only purpose is to rerun project-wide integration checks;
-the parent runs these after merge:
+only when the unit changes files. The paths field is exclusive write ownership,
+not a list of files inspected: every writes=false unit MUST return paths=[] and
+may name inspected files in its objective, criteria, and checks instead.
+Writing units need disjoint concurrent path scopes and real checks. Add a
+dependency whenever units overlap or consume another unit's result. Assign the
+best owner persona. Do not emit persona-review units or units whose only purpose
+is to rerun project-wide integration checks; the parent runs these after merge:
 ${integrationChecks.length
   ? integrationChecks.join('\n')
   : 'No extra integration checks were supplied.'}

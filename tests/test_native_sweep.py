@@ -41,6 +41,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "sweep-integrator" not in planner
     assert "semantically distinct units" in planner
     assert "Deduplicate units" in planner
+    assert "every writes=false unit MUST return paths=[]" in planner
     assert "await parallel([" in final
     assert "READ-ONLY FINAL SWEEP AUDIT" in final
     assert "criterionErrors" in final
@@ -110,6 +111,46 @@ def test_plan_validator_rejects_cycles_escapes_and_parallel_overlap() -> None:
                 ],
             },
             "pattern": None,
+        },
+        {
+            "name": "valid-read-only",
+            "plan": {
+                "status": "completed",
+                "baseSha": "a" * 40,
+                "repoClean": True,
+                "units": [
+                    {
+                        **base_unit,
+                        "id": "research",
+                        "kind": "research",
+                        "writes": False,
+                        "persona": "researcher",
+                        "paths": [],
+                        "checks": ["rg pattern src"],
+                    },
+                ],
+            },
+            "pattern": None,
+        },
+        {
+            "name": "read-only-write-scope",
+            "plan": {
+                "status": "completed",
+                "baseSha": "a" * 40,
+                "repoClean": True,
+                "units": [
+                    {
+                        **base_unit,
+                        "id": "research",
+                        "kind": "research",
+                        "writes": False,
+                        "persona": "researcher",
+                        "paths": ["src/a/**"],
+                        "checks": ["rg pattern src"],
+                    },
+                ],
+            },
+            "pattern": "read-only unit cannot claim write paths",
         },
         {
             "name": "cycle",
