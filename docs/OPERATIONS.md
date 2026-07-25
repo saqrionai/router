@@ -76,10 +76,17 @@ firmware, crash, vulnerability, and other authorization-required work. Clearly
 non-security tasks use `general-forum`, which keeps Fable available for neutral
 verification.
 
+Opus 4.8 is recovery-only and always comes after every eligible normal Opus 5
+or GPT route. A GPT provider failure therefore falls back to Opus 5 before
+4.8; 4.8 remains available only when the normal routes are unavailable,
+malformed, or deterministically degraded.
+
 ## Workflow Control
 
 Use `/workflows` for progress, agents, prompts, tool calls, token totals,
-pausing, stopping, and resumption. Native progress is saved by Claude Code.
+pausing, stopping, and resumption. Select an agent and press `x` to stop it or
+`r` to restart it. Press `p` at run level to pause or resume the workflow.
+Native progress is saved by Claude Code.
 There is no local API worker, background dashboard scheduler, or LaunchAgent.
 
 The workflow defaults to six rounds, allows at most eight, and stops after two
@@ -95,6 +102,27 @@ verification loop. For bounded tasks, ask for a `quick workflow`; it runs
 evidence, artifact, verification, and judgment units while omitting the
 competing hypothesis and cross-examination phases and defaults to two rounds.
 Use the full forum for ambiguous, adversarial, or broad work.
+
+Process-backed model agents use
+`claude-plugin/bin/agent-supervisor`. It launches one durable process, records
+stdout/stderr growth, descendant process creation, and process-tree CPU time,
+returns a heartbeat every poll window, stops after ten minutes without any of
+those progress signals, and enforces a 30-minute total deadline. A poll observes
+the existing agent; it never launches a retry. Native Claude `agent()` calls
+remain under Claude Code's `/workflows` runtime because wrapping them in an
+external process would discard native pause, stop, save, and resume behavior.
+
+Native Claude sessions and subagents publish the same lifecycle concept through
+Claude hooks. `SessionStart`, `SubagentStart`, `PreToolUse`, `PostToolUse`,
+`SubagentStop`, and `SessionEnd` update normalized records under
+`~/.local/state/orchestrator/heartbeats/<session>/<agent>.json`. These records
+show the last native lifecycle or tool event. Claude's own journal and
+`/workflows` remain authoritative for long reasoning calls that do not emit a
+tool event. The native runtime supports manual per-agent stop and restart, but
+workflow JavaScript does not expose an asynchronous cancellation handle that a
+plugin watchdog can call while `await agent()` is in flight. Hook-level
+`continue: false` is not used as a substitute because tool hook payloads do not
+guarantee a target agent id and could stop more than the intended worker.
 
 ## Beads Queue
 
@@ -140,12 +168,12 @@ enter a native `codex-worker`, which performs exactly one real
 `codex-subagent` call and returns its structured result. This is external model
 transport under native scheduling, not another orchestrator.
 
-Provider failures use the Fugu assignment's declared fallback order. Native
-Opus 4.8 is recovery-only and immediately follows every primary. It activates
-for unavailable or invalid output and for deterministic evidence-quality
-failures; the queue records the attempted model and exact reason. Model
-disagreement alone never triggers fallback. Adding a future K3 adapter does not
-change queue or judge semantics.
+Provider failures use the Fugu assignment's declared fallback order. Every
+eligible normal Opus 5 or GPT route is attempted before native Opus 4.8.
+Recovery-only 4.8 activates only after normal routes are unavailable, invalid,
+or fail deterministic evidence-quality checks; the queue records the attempted
+model and exact reason. Model disagreement alone never triggers fallback.
+Adding a future K3 adapter does not change queue or judge semantics.
 
 ## UltraCheck
 

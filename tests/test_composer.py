@@ -48,7 +48,7 @@ class ComposerTests(unittest.TestCase):
         for assignment in plan.assignments:
             self.assertNotEqual(assignment.model, "opus-4.8-bounded")
             self.assertEqual(
-                assignment.fallback_order[1],
+                assignment.fallback_order[-1],
                 "opus-4.8-bounded",
             )
 

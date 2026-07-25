@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+"""Supervise a process-backed model agent with durable heartbeat state."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+
+TERMINAL_STATES = {"completed", "failed", "stale", "stopped", "timed-out", "orphaned"}
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def state_root() -> Path:
+    configured = os.environ.get("ORCHESTRATOR_AGENT_RUN_ROOT")
+    root = (
+        Path(configured).expanduser()
+        if configured
+        else Path.home() / ".local" / "state" / "orchestrator" / "agent-runs"
+    )
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return root
+
+
+def atomic_json(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def process_alive(pid: int | None) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+def terminate_group(pid: int | None) -> None:
+    if not pid or not process_alive(pid):
+        return
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and process_alive(pid):
+        time.sleep(0.1)
+    if process_alive(pid):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def read_tail(path: Path, limit: int = 4096) -> str:
+    if not path.exists():
+        return ""
+    with path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        handle.seek(max(0, size - limit))
+        return handle.read().decode("utf-8", errors="replace")
+
+
+def cpu_time_seconds(value: str) -> float:
+    days = 0
+    rendered = value
+    if "-" in rendered:
+        day_text, rendered = rendered.split("-", 1)
+        days = int(day_text)
+    parts = rendered.split(":")
+    if len(parts) == 3:
+        hours, minutes, seconds = parts
+    elif len(parts) == 2:
+        hours = "0"
+        minutes, seconds = parts
+    else:
+        raise ValueError(f"unrecognized process CPU time: {value}")
+    return (
+        days * 86_400
+        + int(hours) * 3_600
+        + int(minutes) * 60
+        + float(seconds)
+    )
+
+
+def process_snapshot(root_pid: int | None) -> list[dict[str, Any]]:
+    if not root_pid:
+        return []
+    result = subprocess.run(
+        ["ps", "-axo", "pid=,ppid=,%cpu=,state=,etime=,time=,command="],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    rows: dict[int, dict[str, Any]] = {}
+    children: dict[int, list[int]] = {}
+    for line in result.stdout.splitlines():
+        parts = line.strip().split(None, 6)
+        if len(parts) != 7:
+            continue
+        try:
+            pid = int(parts[0])
+            ppid = int(parts[1])
+            cpu = float(parts[2])
+            cpu_time = cpu_time_seconds(parts[5])
+        except ValueError:
+            continue
+        rows[pid] = {
+            "pid": pid,
+            "ppid": ppid,
+            "cpu": cpu,
+            "state": parts[3],
+            "elapsed": parts[4],
+            "cpu_time_seconds": cpu_time,
+            "command": parts[6][:300],
+        }
+        children.setdefault(ppid, []).append(pid)
+    selected: list[dict[str, Any]] = []
+    pending = [root_pid]
+    seen: set[int] = set()
+    while pending:
+        pid = pending.pop()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        if pid in rows:
+            selected.append(rows[pid])
+        pending.extend(children.get(pid, []))
+    return sorted(selected, key=lambda item: item["pid"])
+
+
+def activity_epoch(
+    run_dir: Path,
+    metadata: dict[str, Any],
+    output_paths: list[Path],
+    processes: list[dict[str, Any]],
+) -> float:
+    path = run_dir / "activity.json"
+    now = time.time()
+    output_sizes = {
+        output.name: output.stat().st_size if output.exists() else 0
+        for output in output_paths
+    }
+    process_cpu = {
+        str(process["pid"]): float(process["cpu_time_seconds"])
+        for process in processes
+    }
+    previous = read_json(path) if path.exists() else {}
+    previous_sizes = previous.get("output_sizes", {})
+    previous_cpu = previous.get("process_cpu_seconds", {})
+    output_grew = any(
+        size > int(previous_sizes.get(name, 0))
+        for name, size in output_sizes.items()
+    )
+    process_started = any(pid not in previous_cpu for pid in process_cpu)
+    cpu_advanced = any(
+        cpu_time > float(previous_cpu.get(pid, cpu_time))
+        for pid, cpu_time in process_cpu.items()
+    )
+    last_activity = float(
+        previous.get("last_activity_epoch", metadata["started_epoch"])
+    )
+    if output_grew or process_started or cpu_advanced:
+        last_activity = now
+    atomic_json(
+        path,
+        {
+            "last_activity_epoch": last_activity,
+            "output_sizes": output_sizes,
+            "process_cpu_seconds": process_cpu,
+            "observed_at": utc_now(),
+        },
+    )
+    return last_activity
+
+
+def run_dir_from(value: str) -> Path:
+    path = Path(value).expanduser().resolve()
+    if not (path / "metadata.json").is_file():
+        raise ValueError(f"not an agent-supervisor run directory: {path}")
+    return path
+
+
+def command_start(args: argparse.Namespace) -> int:
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        raise ValueError("start requires a command after --")
+    workdir = Path(args.workdir).expanduser().resolve()
+    if not workdir.is_dir():
+        raise ValueError(f"workdir is not a directory: {workdir}")
+    run_id = f"{args.name}-{uuid.uuid4().hex[:16]}"
+    run_dir = state_root() / run_id
+    run_dir.mkdir(mode=0o700)
+    stdin_name = None
+    if args.stdin_file:
+        source = Path(args.stdin_file).expanduser().resolve()
+        if not source.is_file():
+            raise ValueError(f"stdin file does not exist: {source}")
+        stdin_name = "stdin"
+        shutil.copyfile(source, run_dir / stdin_name)
+    metadata = {
+        "version": 1,
+        "run_id": run_id,
+        "name": args.name,
+        "command": command,
+        "workdir": str(workdir),
+        "stdin_file": stdin_name,
+        "result_file": args.result_file,
+        "max_runtime_seconds": args.max_runtime,
+        "started_at": utc_now(),
+        "started_epoch": time.time(),
+    }
+    atomic_json(run_dir / "metadata.json", metadata)
+    monitor_log = (run_dir / "monitor.log").open("ab")
+    monitor = subprocess.Popen(
+        [sys.executable, str(Path(__file__).resolve()), "_run", str(run_dir)],
+        stdin=subprocess.DEVNULL,
+        stdout=monitor_log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    monitor_log.close()
+    metadata["monitor_pid"] = monitor.pid
+    atomic_json(run_dir / "metadata.json", metadata)
+    print(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "run_dir": str(run_dir),
+                "state": "starting",
+                "monitor_pid": monitor.pid,
+            }
+        ),
+        flush=True,
+    )
+    return 0
+
+
+def command_run(args: argparse.Namespace) -> int:
+    run_dir = run_dir_from(args.run_dir)
+    metadata_path = run_dir / "metadata.json"
+    metadata = read_json(metadata_path)
+    command = [
+        item.replace("{run_dir}", str(run_dir))
+        for item in metadata["command"]
+    ]
+    stdin_path = run_dir / metadata["stdin_file"] if metadata["stdin_file"] else None
+    stdout_path = run_dir / "stdout.log"
+    stderr_path = run_dir / "stderr.log"
+    with (
+        (stdin_path.open("rb") if stdin_path else open(os.devnull, "rb")) as stdin,
+        stdout_path.open("ab", buffering=0) as stdout,
+        stderr_path.open("ab", buffering=0) as stderr,
+    ):
+        child = subprocess.Popen(
+            command,
+            cwd=metadata["workdir"],
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            start_new_session=True,
+        )
+        metadata["child_pid"] = child.pid
+        metadata["launched_at"] = utc_now()
+        atomic_json(metadata_path, metadata)
+        timed_out = False
+        try:
+            return_code = child.wait(timeout=float(metadata["max_runtime_seconds"]))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            terminate_group(child.pid)
+            return_code = 124
+    (run_dir / "exit_code").write_text(f"{return_code}\n", encoding="ascii")
+    if timed_out:
+        (run_dir / "timed_out").write_text(utc_now() + "\n", encoding="ascii")
+    (run_dir / "finished_at").write_text(utc_now() + "\n", encoding="ascii")
+    return 0
+
+
+def status_payload(run_dir: Path) -> dict[str, Any]:
+    metadata = read_json(run_dir / "metadata.json")
+    exit_path = run_dir / "exit_code"
+    stop_path = run_dir / "stop_reason.json"
+    exit_code = (
+        int(exit_path.read_text(encoding="ascii").strip())
+        if exit_path.exists()
+        else None
+    )
+    stop_reason = read_json(stop_path) if stop_path.exists() else None
+    child_pid = metadata.get("child_pid")
+    monitor_pid = metadata.get("monitor_pid")
+    if stop_reason:
+        state = "stale" if stop_reason.get("reason") == "no-progress" else "stopped"
+    elif exit_code is not None:
+        if (run_dir / "timed_out").exists():
+            state = "timed-out"
+        else:
+            state = "completed" if exit_code == 0 else "failed"
+    elif process_alive(child_pid) or process_alive(monitor_pid):
+        state = "running"
+    else:
+        state = "orphaned"
+    output_paths = [run_dir / "stdout.log", run_dir / "stderr.log"]
+    result_path = (
+        run_dir / metadata["result_file"]
+        if metadata.get("result_file")
+        else None
+    )
+    processes = process_snapshot(child_pid)
+    last_progress_epoch = activity_epoch(
+        run_dir,
+        metadata,
+        output_paths,
+        processes,
+    )
+    return {
+        "run_id": metadata["run_id"],
+        "name": metadata["name"],
+        "state": state,
+        "run_dir": str(run_dir),
+        "started_at": metadata["started_at"],
+        "elapsed_seconds": round(time.time() - float(metadata["started_epoch"]), 1),
+        "last_progress_at": datetime.fromtimestamp(
+            last_progress_epoch,
+            tz=UTC,
+        ).isoformat(),
+        "idle_seconds": round(time.time() - last_progress_epoch, 1),
+        "stdout_bytes": output_paths[0].stat().st_size if output_paths[0].exists() else 0,
+        "stderr_bytes": output_paths[1].stat().st_size if output_paths[1].exists() else 0,
+        "exit_code": exit_code,
+        "result_ready": bool(result_path and result_path.is_file()),
+        "processes": processes,
+        "recent_output": read_tail(output_paths[0], 3000),
+        "recent_errors": read_tail(output_paths[1], 1500),
+        "stop_reason": stop_reason,
+    }
+
+
+def print_result(run_dir: Path, payload: dict[str, Any]) -> None:
+    metadata = read_json(run_dir / "metadata.json")
+    result_path = (
+        run_dir / metadata["result_file"]
+        if metadata.get("result_file")
+        else None
+    )
+    print(json.dumps(payload), flush=True)
+    if result_path and result_path.is_file():
+        result = result_path.read_text(encoding="utf-8", errors="replace")
+        print("AGENT_RESULT_BEGIN", flush=True)
+        print(result[-120_000:], flush=True)
+        print("AGENT_RESULT_END", flush=True)
+
+
+def stop_run(run_dir: Path, reason: str, detail: str) -> dict[str, Any]:
+    metadata = read_json(run_dir / "metadata.json")
+    atomic_json(
+        run_dir / "stop_reason.json",
+        {
+            "reason": reason,
+            "detail": detail,
+            "stopped_at": utc_now(),
+        },
+    )
+    terminate_group(metadata.get("child_pid"))
+    return status_payload(run_dir)
+
+
+def command_status(args: argparse.Namespace) -> int:
+    run_dir = run_dir_from(args.run_dir)
+    print_result(run_dir, status_payload(run_dir))
+    return 0
+
+
+def command_wait(args: argparse.Namespace) -> int:
+    run_dir = run_dir_from(args.run_dir)
+    deadline = time.monotonic() + args.window
+    next_report = 0.0
+    while True:
+        payload = status_payload(run_dir)
+        if payload["state"] in TERMINAL_STATES:
+            print_result(run_dir, payload)
+            return 0
+        if payload["idle_seconds"] >= args.idle_limit:
+            payload = stop_run(
+                run_dir,
+                "no-progress",
+                (
+                    f"no stdout or stderr growth for {payload['idle_seconds']}s "
+                    f"(limit {args.idle_limit}s)"
+                ),
+            )
+            print_result(run_dir, payload)
+            return 0
+        now = time.monotonic()
+        if now >= deadline:
+            payload["wait_window_expired"] = True
+            print_result(run_dir, payload)
+            return 0
+        if now >= next_report:
+            heartbeat = {
+                key: payload[key]
+                for key in (
+                    "run_id",
+                    "state",
+                    "elapsed_seconds",
+                    "idle_seconds",
+                    "stdout_bytes",
+                    "stderr_bytes",
+                    "processes",
+                )
+            }
+            print(json.dumps({"heartbeat": heartbeat}), flush=True)
+            next_report = now + args.report_every
+        time.sleep(min(args.interval, max(0.1, deadline - now)))
+
+
+def command_stop(args: argparse.Namespace) -> int:
+    run_dir = run_dir_from(args.run_dir)
+    print_result(run_dir, stop_run(run_dir, args.reason, args.detail))
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(
+        description="Durable heartbeat supervisor for process-backed model agents."
+    )
+    commands = root.add_subparsers(dest="subcommand", required=True)
+
+    start = commands.add_parser("start")
+    start.add_argument("--name", required=True)
+    start.add_argument("--workdir", required=True)
+    start.add_argument("--stdin-file")
+    start.add_argument("--result-file")
+    start.add_argument("--max-runtime", type=float, default=1800)
+    start.add_argument("command", nargs=argparse.REMAINDER)
+    start.set_defaults(function=command_start)
+
+    internal = commands.add_parser("_run")
+    internal.add_argument("run_dir")
+    internal.set_defaults(function=command_run)
+
+    status = commands.add_parser("status")
+    status.add_argument("run_dir")
+    status.set_defaults(function=command_status)
+
+    wait = commands.add_parser("wait")
+    wait.add_argument("run_dir")
+    wait.add_argument("--window", type=float, default=240)
+    wait.add_argument("--interval", type=float, default=5)
+    wait.add_argument("--report-every", type=float, default=30)
+    wait.add_argument("--idle-limit", type=float, default=600)
+    wait.set_defaults(function=command_wait)
+
+    stop = commands.add_parser("stop")
+    stop.add_argument("run_dir")
+    stop.add_argument("--reason", default="operator-stop")
+    stop.add_argument("--detail", default="stopped by workflow supervisor")
+    stop.set_defaults(function=command_stop)
+    return root
+
+
+def main() -> int:
+    try:
+        args = parser().parse_args()
+        return int(args.function(args))
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(json.dumps({"error": str(error)}), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

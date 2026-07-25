@@ -26,9 +26,13 @@ def test_quick_workflow_has_bounded_graph_and_queue_evidence() -> None:
 def test_codex_adapter_is_one_call_and_non_git_safe() -> None:
     source = CODEX_AGENT.read_text(encoding="utf-8")
 
-    assert "maxTurns: 4" in source
+    assert "maxTurns: 18" in source
     assert "exactly once" in source
     assert "--skip-git-repo-check" in source
+    assert "agent-supervisor" in source
+    assert "--window 240 --idle-limit 600" in source
+    assert "observing the same process, not retrying the model" in source
+    assert "--max-runtime 1800" in source
     assert 'CODEX_SUBAGENT_MODEL="gpt-5.6-sol"' in source
     assert "CODEX_SUBAGENT_REASONING_EFFORT=" in source
     assert "CODEX_SUBAGENT_SANDBOX=" in source

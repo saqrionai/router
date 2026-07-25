@@ -6,16 +6,20 @@ Claude Code native dynamic workflows are the sole scheduler. They own phases,
 parallel agents, tool execution, worktrees, interruption, resumption, token
 telemetry, and the `/workflows` interface.
 
-Orchestrator adds three support boundaries:
+Orchestrator adds four support boundaries:
 
 | Component | Responsibility |
 | --- | --- |
 | Fugu MCP | Rank persona/model routes and return bounded fallbacks |
 | Native workflow | Queue, evidence flow, verification, judgment, and revision |
+| Agent telemetry | Normalize native hook events and supervise process-backed adapters |
 | Beads bridge | Durable intake, dependencies, acceptance criteria, and checkpoint |
 
-The Python package cannot start, resume, stop, simulate, or supervise workers.
-There is no alternate API, dashboard scheduler, or model gateway.
+The Python routing package cannot start, resume, stop, or simulate workflow
+workers. There is no alternate API, dashboard scheduler, or model gateway. A
+plugin-local process supervisor observes one already-assigned external adapter
+call; it does not choose work, create queue units, retry models, or schedule
+agents.
 
 ## Native Queue
 
@@ -42,8 +46,19 @@ task.
 
 Opus 5, Fable 5, and the recovery-only Opus 4.8 route run as native Claude
 agents. A GPT-5.6 assignment runs a native `codex-worker` adapter. That adapter
-invokes `codex-subagent` exactly once, returns the real structured result, and
-cannot recursively orchestrate.
+starts `codex-subagent` exactly once through the generic process supervisor,
+polls that same process for output and descendant activity, returns the real
+structured result, and cannot recursively orchestrate. A poll is observation,
+not a retry.
+
+Native Claude agents cannot be wrapped in that external launcher without losing
+Claude Code's native workflow ownership. Lifecycle and tool hooks instead write
+the same normalized heartbeat records for native sessions and subagents.
+Claude's journal and `/workflows` remain authoritative during reasoning periods
+that emit no hook event. Native control is still available: `/workflows` can
+stop or restart a selected agent and pause or resume the run. The workflow
+JavaScript API does not currently expose a per-agent cancellation handle to an
+automatic watchdog while `await agent()` is in flight.
 
 Logical model ids remain separate from transport:
 

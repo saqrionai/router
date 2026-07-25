@@ -39,7 +39,7 @@ def test_route_team_maps_models_to_native_agent_types(tmp_path: Path) -> None:
     assert assignments["researcher"]["agent_type"] == "orchestrator:opus-worker"
     for assignment in assignments.values():
         assert assignment["model"] != "opus-4.8-bounded"
-        assert assignment["fallback_order"][1] == "opus-4.8-bounded"
+        assert assignment["fallback_order"][-1] == "opus-4.8-bounded"
     assert assignments["engineer"]["agent_type"] == "orchestrator:codex-worker"
     assert assignments["verifier"]["agent_type"] == "orchestrator:opus-worker"
     assert assignments["researcher"]["routing_distribution"]

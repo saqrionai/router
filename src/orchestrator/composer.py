@@ -240,12 +240,12 @@ class TeamComposer:
             + tuple(
                 candidate
                 for candidate in eligible_fallbacks
-                if self.models[candidate].fallback_only
+                if not self.models[candidate].fallback_only
             )
             + tuple(
                 candidate
                 for candidate in eligible_fallbacks
-                if not self.models[candidate].fallback_only
+                if self.models[candidate].fallback_only
             )
         )
         return TeamAssignment(

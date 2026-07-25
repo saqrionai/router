@@ -7,12 +7,13 @@ resumption, and the `/workflows` interface. Orchestrator contributes:
 - six evidence-oriented personas;
 - learned model/persona routing;
 - bounded OpenAI delegation through the real Codex CLI;
+- heartbeat-aware supervision for process-backed model adapters;
 - an explicit in-run work queue;
 - independent criterion-level verification and judgment;
 - no-progress and round-budget stops;
 - structural UltraCheck gates;
 - serialized Beads intake and result checkpoints; and
-- native lifecycle telemetry.
+- normalized native lifecycle and tool telemetry.
 
 There is one execution plane:
 
@@ -26,7 +27,7 @@ Claude native workflow scheduler
              |
              +--> Opus 5 native workers
              +--> Fable 5 neutral non-security reviewers
-             +--> codex-worker --> real GPT-5.6 call
+             +--> codex-worker --> supervised real GPT-5.6 call
              +--> Opus 4.8 native recovery (quality-gated fallback only)
              |
              v
@@ -41,7 +42,10 @@ serialized Beads checkpoint
 Fugu never starts a process. It ranks enabled routes using persona fit, task
 traits, provider independence, capacity policy, and prior outcomes. A provider
 adapter performs one bounded worker call and returns to the native workflow; it
-cannot recursively schedule agents.
+cannot recursively schedule agents. The generic process supervisor observes
+external adapter activity and enforces idle and total deadlines. Native Claude
+agents publish lifecycle and tool heartbeats through hooks while remaining
+owned by Claude Code.
 
 ## Start A Run
 
@@ -72,7 +76,9 @@ The skill routes security and authorization-required work through
 Fable remains eligible as a neutral verifier.
 
 Use `/workflows` to inspect phases, queue activity, agents, prompts, tools,
-tokens, and results. Claude Code saves workflow progress for session resumption.
+tokens, and results. Select an agent and press `x` to stop it or `r` to restart
+it; press `p` to pause or resume the run. Claude Code saves workflow progress
+for session resumption.
 
 In a repository with `.beads`, the skill first resumes the highest-priority
 in-progress item. If none exists, it claims the highest-priority
