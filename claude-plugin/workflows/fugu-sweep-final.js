@@ -22,6 +22,7 @@ const task = String(input.task || '').trim()
 const workspace = String(input.workspace || '').trim()
 const workflowRunId = String(input.workflowRunId || '').trim()
 const revisionRound = Number(input.revisionRound || 0)
+const highAssurance = Boolean(input.highAssurance)
 const acceptance = Array.isArray(input.acceptanceCriteria)
   ? input.acceptanceCriteria.map(String).map(item => item.trim()).filter(Boolean)
   : []
@@ -95,7 +96,7 @@ function routes(persona, preferredFamily) {
     ))
   }
   const remainder = eligible.filter(model => !preferred.includes(model))
-  return [...preferred, ...remainder].map(model => ({
+  return [...preferred, ...remainder].slice(0, 2).map(model => ({
     model,
     agentType: agentTypeForModel(model),
   }))
@@ -358,20 +359,25 @@ or command evidence.`, {
 }
 
 phase('Independent audit')
-const audits = await parallel([
+const auditCalls = [
   () => audit(
     'verifier',
     'Adversarially inspect the integrated artifact, rerun decisive checks, and identify regressions, hostile boundary failures, or unsupported completion claims.',
     'sweep-artifact-verifier',
     'openai',
   ),
-  () => audit(
+]
+if (highAssurance) {
+  auditCalls.push(() => audit(
     'researcher',
     'Independently check scope coverage, omissions, dependency integration, and whether the evidence actually supports the original task.',
     'sweep-coverage-verifier',
     'anthropic',
-  ),
-])
+  ))
+}
+const audits = highAssurance
+  ? await parallel(auditCalls)
+  : [await auditCalls[0]()]
 
 phase('Judgment')
 let judgment = null
@@ -397,7 +403,7 @@ ${excerpt(audits)}
 
 Resolve every exact criterion in order. Worker and reviewer returns are
 testimony, not proof. Accept only when integration completed, every criterion
-has direct evidence, both independent audits support it, and no unresolved
+has direct evidence, every required independent audit supports it, and no unresolved
 critical or high finding remains. Do not edit or launch another workflow.`, {
       label: `sweep-final-judge${index ? `-fallback${index}` : ''}`,
       phase: 'Judgment',
@@ -466,6 +472,7 @@ return {
     )
     : 'accepted',
   revisionRound,
+  highAssurance,
   remediationAllowed: blocked && revisionRound === 0,
   revisionPacket,
   audits,

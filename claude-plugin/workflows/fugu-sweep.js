@@ -42,6 +42,7 @@ const tracking = input.tracking && typeof input.tracking === 'object'
   ? input.tracking
   : null
 const remediationRound = Number(input.remediationRound || 0)
+const highAssurance = Boolean(input.highAssurance)
 const revisionPacket = input.revisionPacket
   && typeof input.revisionPacket === 'object'
   && !Array.isArray(input.revisionPacket)
@@ -58,14 +59,14 @@ if (
     reason: 'remediationRound must be 0, or 1 with a revisionPacket',
   }
 }
-const unitLimit = remediationRound === 1 ? 16 : 64
+const unitLimit = remediationRound === 1 ? 4 : 64
 const maxUnits = Math.max(
   1,
-  Math.min(Number(input.maxUnits || unitLimit), unitLimit),
+  Math.min(Number(input.maxUnits || Math.min(8, unitLimit)), unitLimit),
 )
 const maxConcurrency = Math.max(
   1,
-  Math.min(Number(input.maxConcurrency || 8), 12),
+  Math.min(Number(input.maxConcurrency || 4), 8),
 )
 const securityTask = Boolean(input.securityTask)
 const integrationChecks = Array.isArray(input.integrationChecks)
@@ -234,7 +235,7 @@ function stableBucket(value, modulus) {
 }
 
 function verificationCount(unit, cohortFirst) {
-  if (unit.risk === 'critical') return 2
+  if (unit.risk === 'critical') return highAssurance ? 2 : 1
   if (unit.risk === 'high') return 1
   if (securityTask && unit.risk === 'medium') return 1
   if (unit.risk === 'medium') {
@@ -266,7 +267,7 @@ function routes(persona) {
     ...(Array.isArray(selected.fallback_order)
       ? selected.fallback_order.map(String)
       : []),
-  ])).slice(0, 4)
+  ])).slice(0, 2)
 }
 
 function ownerRoutes(unit, writingOrdinal) {
@@ -389,6 +390,7 @@ if (planErrors.length) {
     maxConcurrency,
     integrationChecks,
     remediationRound,
+    highAssurance,
     revisionPacket,
     plan,
     planErrors,
@@ -423,6 +425,7 @@ return {
   maxConcurrency,
   integrationChecks,
   remediationRound,
+  highAssurance,
   revisionPacket,
   plan: {
     ...plan,

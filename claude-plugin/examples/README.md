@@ -15,11 +15,12 @@ independent units in parallel worktrees, verify by risk, and integrate only
 passing scoped commits. Do not push.
 ```
 
-The planner may queue up to 64 units. The default weighted active capacity is
-8, so heavy builds do not run 64 copies at once. Owners get task-specific
-personas and Fugu routes. Critical and high-risk units always get independent
-review; medium and low risk use deterministic cohort sampling. A serial
-integrator stops on dirty state, unexpected paths, conflicts, or failed checks.
+The planner queues at most 8 units by default with weighted active capacity 4.
+An explicit large sweep permits 24/6; an explicit 64-unit request permits 64/8.
+Owners get task-specific personas and Fugu routes. Critical and high-risk units
+always get independent review; medium and low risk use deterministic cohort
+sampling. A serial integrator stops on dirty state, unexpected paths,
+conflicts, or failed checks.
 Planning and final audit appear in `/workflows`; owner waves and reviewers
 appear in Claude Code's native agent and task views.
 
@@ -31,8 +32,9 @@ its exact H1 with direct file evidence and independent criterion-level judgment.
 Do not edit files.
 ```
 
-Quick mode runs one evidence agent, one artifact writer, one verifier, and one
-judge, with no revision wave. Use it only for low-risk bounded checks.
+Quick mode runs one artifact owner and one independent criterion checker, with
+no standing research panel and no revision wave. The owner gathers evidence as
+needed. This is the economy-first default for a substantial single artifact.
 
 ## Standard Forum
 
@@ -41,7 +43,7 @@ judge, with no revision wave. Use it only for low-risk bounded checks.
 the regression test and relevant suite.
 ```
 
-Standard mode is the default. It runs two opening agents in parallel, one
+Standard mode is explicit. It runs two opening agents in parallel, one
 artifact writer after that evidence barrier, and two independent verification
 agents in parallel before judgment. One evidence-backed revision is allowed,
 for six calls normally and at most ten.

@@ -65,8 +65,8 @@ For a broad project with multiple independent implementation units, use:
 /orchestrator:sweep continue
 ```
 
-The planner workflow validates a dependency DAG. The skill queues at most 64
-native tasks, keeps a bounded weighted worker pool active, launches writing
+The planner workflow validates a dependency DAG. The skill queues at most 8
+native tasks by default, keeps 4 weighted worker slots active, launches writing
 owners through direct native worktree Agents, applies independent persona
 review by risk, and serially cherry-picks accepted commits. A final saved
 workflow independently audits the integrated checkout. It never pushes or
@@ -126,11 +126,11 @@ budget. Recovery agents use at most three substantive tool calls, may retry a
 no-signal machine check only once, and must keep a shell command's combined
 declared worst-case runtime below 90 seconds. A second no-signal result ends
 testing and returns a blocked or partial result instead of consuming another
-verification loop. Standard mode is the default: two parallel opening units,
-one artifact writer, two parallel verification units, and one judge, with at
-most one revision. Ask for a `quick workflow` to use one opening unit, one
-writer, one verifier, one judge, and no revision. Ask for `full forum` only for
-ambiguous, adversarial, or broad work; it adds parallel cross-examination and
+verification loop. Quick mode is the default: one artifact owner, one
+independent criterion checker, and no revision. Ask for `standard forum` to
+use two parallel opening units, two parallel verification units, and at most
+one revision. Ask for `full forum` only for ambiguous, adversarial, or broad
+work; it adds parallel cross-examination and
 allows at most two revisions.
 
 Process-backed model agents use

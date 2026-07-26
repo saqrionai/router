@@ -17,13 +17,16 @@ MCP_LAUNCHER = ROOT / "claude-plugin" / "bin" / "orchestrator-mcp"
 def test_workflow_modes_have_bounded_graph_and_queue_evidence() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "const quick = !fullForum && Boolean(input.quick)" in source
+    assert "const standardForum = !fullForum" in source
+    assert "const quick = !fullForum && !standardForum" in source
     assert "const fullForum = ultracheck" in source
-    assert "const mode = quick ? 'quick' : fullForum ? 'full' : 'standard'" in source
+    assert "const mode = fullForum ? 'full' : standardForum ? 'standard' : 'quick'" in source
     assert "quick ? 1 : fullForum ? 3 : 2" in source
     assert "const cross = fullForum" in source
     assert "const opening = quick" in source
     assert "const verification = quick" in source
+    assert source.count("? []") >= 2
+    assert "QUICK DELIVERY GATE:" in source
     assert "NATIVE QUEUE SNAPSHOT:" in source
     assert "${excerpt(queueSnapshot(), 12000)}" in source
 
@@ -56,7 +59,8 @@ def test_orchestrate_skill_defaults_to_automatic_bead_intake() -> None:
     assert "highest-priority `in_progress`" in source
     assert "`resolved_task`" in source
     assert "another live client skips that Bead" in source
-    assert "`standard`: the default" in source
+    assert "`quick`: the economy-first default" in source
+    assert "`standard`: only when" in source
     assert "Full mode additionally runs parallel cross-examination" in source
 
 

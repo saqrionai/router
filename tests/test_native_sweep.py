@@ -31,8 +31,8 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     integrator = INTEGRATOR.read_text(encoding="utf-8")
     bounded_planner = PLANNER.read_text(encoding="utf-8")
 
-    assert "Math.min(Number(input.maxUnits || unitLimit), unitLimit)" in planner
-    assert "Math.min(Number(input.maxConcurrency || 8), 12)" in planner
+    assert "Math.min(Number(input.maxUnits || Math.min(8, unitLimit)), unitLimit)" in planner
+    assert "Math.min(Number(input.maxConcurrency || 4), 8)" in planner
     assert "const plannerModel = 'opus-5-bounded'" in planner
     assert "function ownerRoutes(unit, writingOrdinal)" in planner
     assert "writingOrdinal % 4 === 1" in planner
@@ -51,7 +51,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "Every unit id MUST be lowercase" in planner
     assert "Every writing path MUST be relative to the" in planner
     assert "^[a-z0-9][a-z0-9._-]{0,63}$" in planner
-    assert "await parallel([" in final
+    assert "await parallel(auditCalls)" in final
     assert "READ-ONLY FINAL SWEEP AUDIT" in final
     assert "criterionErrors" in final
     assert r".replace(/^\d+[.)]\s+/, '')" in final
@@ -66,7 +66,7 @@ def test_sweep_uses_read_only_workflows_and_direct_isolated_writers() -> None:
     assert "direct top-level native `Agent` call" in skill
     assert "`isolation: worktree`" in skill
     assert "ignores custom-agent worktree isolation and explicit `cwd`" in skill
-    assert "at most 8 weighted slots" in skill
+    assert "never exceeds 8" in skill
     assert "TaskCreate" in skill
     assert "TaskStop" in skill
     assert "Ten minutes with none of those signals is `no-progress`" in skill
@@ -273,11 +273,14 @@ def test_risk_policy_is_deterministic_and_escalates_high_risk() -> None:
     script = (
         "const workflowRunId = 'native-test';\n"
         "const securityTask = false;\n"
+        "let highAssurance = false;\n"
         f"{helpers}\n"
         "const critical = {id:'c',risk:'critical'};\n"
         "const high = {id:'h',risk:'high'};\n"
         "const medium = {id:'m',risk:'medium'};\n"
         "const low = {id:'l',risk:'low'};\n"
+        "if (verificationCount(critical, false) !== 1) process.exit(1);\n"
+        "highAssurance = true;\n"
         "if (verificationCount(critical, false) !== 2) process.exit(1);\n"
         "if (verificationCount(high, false) !== 1) process.exit(1);\n"
         "if (verificationCount(medium, true) !== 1) process.exit(1);\n"
@@ -313,11 +316,14 @@ def test_writing_owner_routes_remove_fable_and_keep_read_only_fable() -> None:
     run_node(script)
 
 
-def test_final_gate_requires_two_exact_audits_and_judge_acceptance() -> None:
+def test_final_gate_scales_exact_audits_by_assurance_and_requires_judgment() -> None:
     source = FINAL.read_text(encoding="utf-8")
 
     assert "sweep-artifact-verifier" in source
     assert "sweep-coverage-verifier" in source
+    assert "if (highAssurance)" in source
+    assert "? await parallel(auditCalls)" in source
+    assert ": [await auditCalls[0]()]" in source
     assert "audits.forEach" in source
     assert "integration did not complete" in source
     assert "judge did not accept" in source
@@ -372,13 +378,13 @@ def test_sweep_allows_exactly_one_bounded_remediation_cycle() -> None:
     normalized_skill = " ".join(skill.split())
 
     assert "remediationRound > 1" in planner
-    assert "const unitLimit = remediationRound === 1 ? 16 : 64" in planner
+    assert "const unitLimit = remediationRound === 1 ? 4 : 64" in planner
     assert "Do not re-plan accepted criteria or unrelated improvements." in planner
     assert "revisionRound > 1" in final
     assert "remediationAllowed: blocked && revisionRound === 0" in final
     assert "final-audit-failed-after-remediation" in final
     assert "exactly one bounded remediation cycle" in skill
-    assert "`maxUnits: 16`" in skill
+    assert "`maxUnits: 4`" in skill
     assert "Pass `revisionPacket` inline as the JSON object" in normalized_skill
     assert (
         "including when input validation returns `status: rejected`"

@@ -49,9 +49,12 @@ If the task is empty, ask for it. Otherwise:
 5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
    Select one explicit execution mode:
-   - `quick`: only when the user explicitly requests a quick workflow;
-   - `full`: only when the task contains `full forum`; and
-   - `standard`: the default for every other orchestrated task.
+   - `quick`: the economy-first default;
+   - `standard`: only when the task contains `standard forum`; and
+   - `full`: only when the task contains `full forum`.
+   Quick mode runs one owner and one independent criterion checker, with no
+   mandatory opening panel and no revision. The owner gathers research only as
+   needed to advance the artifact.
    Standard mode runs two parallel opening units, one artifact writer, two
    parallel verification units, and one judge, with at most one revision.
    Full mode additionally runs parallel cross-examination and allows at most
@@ -74,10 +77,11 @@ If the task is empty, ask for it. Otherwise:
   "assignments": "<assignments returned by route_team>",
   "workflowRunId": "<workflow_run_id returned by route_team>",
   "tracking": "<prepare_bead result when enabled, otherwise null>",
-  "quick": false,
+  "quick": true,
+  "standardForum": false,
   "fullForum": false,
   "ultracheck": false,
-  "maxRounds": 2,
+  "maxRounds": 1,
   "noProgressLimit": 2
 }
 ```
@@ -103,6 +107,12 @@ supplied.
 
 Use a normal single-agent turn instead when the task is narrow enough that
 independent evidence gathering and verification would add no value.
+
+Economy is a delivery constraint, not a quality waiver. Each paid workflow must
+target at least one concrete Bead acceptance criterion and end with a changed
+artifact, real check, commit, device measurement, new primary evidence, or a
+typed blocker with the smallest actionable next step. Do not spend another
+forum round to restate existing evidence.
 
 Use `/orchestrator:sweep` instead when the user explicitly asks for batching,
 fan-out, a large project, many independent changes, or high-throughput work

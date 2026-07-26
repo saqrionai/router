@@ -10,7 +10,7 @@ Orchestrator contributes:
 - bounded OpenAI delegation through the real Codex CLI;
 - heartbeat-aware supervision for process-backed model adapters;
 - an explicit in-run work queue;
-- a dependency-aware 64-unit sweep with bounded worktree fan-out;
+- an economy-first 8-unit sweep that can explicitly scale to 64 units;
 - independent criterion-level verification and judgment;
 - no-progress and round-budget stops;
 - structural UltraCheck gates;
@@ -87,6 +87,13 @@ authorized security project with independently ownable units. Sweep uses saved
 native workflows for planning and final audit, then direct native worktree
 agents for implementation. The forum and sweep share the same Fugu policy,
 Beads intake, telemetry, and Claude Code control surfaces.
+
+Routine orchestration is deliberately lean: quick forum is the default, sweep
+starts at 8 queued units and 4 weighted active slots, and final sweep acceptance
+uses one independent audit plus a separate judge. `standard forum`, `full
+forum`, `high assurance`, and larger sweeps are explicit escalations. See
+[`docs/ECONOMY.md`](docs/ECONOMY.md) for the portfolio capacity and progress
+floor.
 
 The skill routes security and authorization-required work through
 `security-research-forum`; clearly non-security work uses `general-forum`, where

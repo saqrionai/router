@@ -39,7 +39,8 @@ agents.
 
 ## Native Queue
 
-The standard forum is the default and uses:
+The quick forum is the economy-first default. Standard forum is an explicit
+escalation and uses:
 
 1. parallel researcher and hypothesis opening posts;
 2. one artifact worker;
@@ -47,8 +48,8 @@ The standard forum is the default and uses:
 4. an exact criterion-level judge; and
 5. at most one revision when the judge returns actionable blockers.
 
-Quick mode uses one opening unit, one artifact worker, one verifier, and one
-judge with no revision. Explicit full mode adds parallel exploit analysis and
+Quick mode uses one artifact owner and one independent criterion checker with
+no revision. Explicit full mode adds parallel exploit analysis and
 adversarial cross-examination and permits at most two revisions. UltraCheck
 uses the full graph and adds broad checks, a clean-process rerun, refutation
 hypotheses, hostile-input categories, and a claim-level evidence ledger.
@@ -60,7 +61,8 @@ task.
 
 The sweep topology is for broad projects:
 
-1. a routed planner inspects the real repository and emits at most 64 units;
+1. a routed planner inspects the real repository and emits at most 8 units by
+   default, 24 for an explicit large sweep, or 64 only when explicitly asked;
 2. JavaScript rejects cycles, unsafe paths, dirty writer bases, missing checks,
    and unordered overlapping write scopes;
 3. the skill creates a native task DAG and launches dependency-ready owners in
@@ -68,7 +70,8 @@ The sweep topology is for broad projects:
 4. writing owners use direct native `Agent(..., isolation: worktree)` calls and
    return scoped commits;
 5. high-risk units always receive independent persona review, critical units
-   receive two reviews, and lower-risk cohorts use deterministic sampling;
+   receive a second review in high-assurance mode, and lower-risk cohorts use
+   deterministic sampling;
 6. one serial integration agent inspects and cherry-picks accepted commits; and
 7. one project judge resolves the original acceptance criteria against the
    resulting main checkout.
@@ -76,12 +79,12 @@ The sweep topology is for broad projects:
 If that final gate blocks, it emits a deterministic revision packet containing
 only failed criteria, high/critical findings, failed checks, integration
 blockers, judge blockers, and next actions. The coordinator may run one
-16-unit remediation sweep from the current accepted HEAD, then rerun the final
+4-unit remediation sweep from the current accepted HEAD, then rerun the final
 gate once. No changed Git/evidence state is `no-progress`; a second rejection
 is `final-audit-failed-after-remediation`. Neither condition can recurse.
 
-Queue capacity and active concurrency are separate. The default queue can hold
-64 units while weighted active capacity is 8. Fugu selects a persona/model
+Queue capacity and active concurrency are separate. The default queue holds
+8 units while weighted active capacity is 4. Fugu selects a persona/model
 route for each unit role; it does not decide dependency readiness. When GPT is
 the routed engineering primary, the first and every fourth writing unit use it
 while Opus 5 carries the remaining writer fan-out. This keeps an independent

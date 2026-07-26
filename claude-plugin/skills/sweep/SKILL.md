@@ -63,16 +63,19 @@ Use a normal turn for a narrow edit.
   "workflowRunId": "<Fugu workflow_run_id>",
   "tracking": "<prepare_bead result or null>",
   "securityTask": false,
-  "maxUnits": 64,
-  "maxConcurrency": 8,
+  "highAssurance": false,
+  "maxUnits": 8,
+  "maxConcurrency": 4,
   "integrationChecks": []
 }
 ```
 
-Set `securityTask` accurately. Keep `maxConcurrency` at 8 unless repository
-resource constraints require less. Queue capacity and active concurrency are
-separate; asking for 64 agents means up to 64 validated units, not 64
-simultaneous writers.
+Set `securityTask` accurately. The economy-first default is eight validated
+units with four weighted active slots. Use 24 units and six slots only when the
+user explicitly requests a large sweep. Use 64 units and eight slots only when
+the user explicitly requests a 64-unit or 64-subagent sweep. Set
+`highAssurance` only for an explicit `high assurance`, `full audit`, or
+`ultracheck` request. Queue capacity and active concurrency are separate.
 
 7. Stop if the planner returns anything except `status: planned`. Do not repair
    an invalid plan informally. Planning uses one low-effort, six-turn native
@@ -84,9 +87,10 @@ simultaneous writers.
 8. Materialize every plan unit with `TaskCreate`, preserve `dependsOn` through
    task dependencies, and keep its unit ID in the task subject. Tasks are the
    live native queue; Beads remains the durable project history.
-9. Run dependency-ready owner units in waves. Keep at most 8 weighted slots
-   active: light costs 1, medium costs 2, and heavy costs 4. Queue capacity may
-   be 64, but never launch 64 simultaneous builds. For each writing unit, make
+9. Run dependency-ready owner units in waves. Keep at most the selected weighted
+   slot limit, which is 4 by default and never exceeds 8: light costs 1, medium
+   costs 2, and heavy costs 4. The plan may be larger only by explicit request;
+   never launch every queued build simultaneously. For each writing unit, make
    a **direct top-level native `Agent` call** with `isolation: worktree`:
 
    Before launching the first writer, require the effective Claude Code setting
@@ -166,10 +170,10 @@ simultaneous writers.
 10. Launch the plan's `reviewCount` independent read-only reviewers after an
     owner returns. Reviewers inspect the actual commit and worktree evidence,
     attempt to falsify the unit criteria, and return findings with severity and
-    evidence. They must not edit. Critical units receive two reviews, high-risk
-    units one, security-medium units one, and lower-risk cohorts use the
-    planner's deterministic sample. A critical/high finding or unsupported
-    criterion blocks integration.
+    evidence. They must not edit. Critical units receive one review by default
+    and two under high assurance; high-risk units receive one, security-medium
+    units receive one, and lower-risk cohorts use the planner's deterministic
+    sample. A critical/high finding or unsupported criterion blocks integration.
 11. After all accepted owners and required reviewers finish, launch exactly one
     direct `orchestrator:sweep-integrator` Agent in the main workspace. Supply
     commits in dependency order, declared paths, planned base SHA, and real
@@ -183,9 +187,10 @@ simultaneous writers.
     original task, the same ordered acceptance-criteria array, authorization,
     assignments,
     workflow run ID, security flag, validated plan, complete owner results,
-    review results, integration result, and `revisionRound: 0`. It runs two
-    independent audits in parallel and an exact criterion-level judge. Accept
-    only when that workflow returns `status: accepted`.
+    review results, integration result, `highAssurance`, and `revisionRound: 0`.
+    The default runs one independent artifact audit and a separate exact
+    criterion-level judge. High assurance adds a parallel coverage audit.
+    Accept only when that workflow returns `status: accepted`.
 13. If the first final workflow returns `status: blocked`,
     `stopReason: final-audit-failed`, and `remediationAllowed: true`, run
     exactly one bounded remediation cycle:
@@ -199,8 +204,8 @@ simultaneous writers.
       before more work starts.
     - Launch `orchestrator:fugu-sweep` once with the original task and
       acceptance criteria, current main checkout, same authorization and
-      assignments, `remediationRound: 1`, the exact `revisionPacket`,
-      `maxUnits: 16`, and the original integration checks. A malformed or
+      assignments, the same `highAssurance`, `remediationRound: 1`, the exact `revisionPacket`,
+      `maxUnits: 4`, and the original integration checks. A malformed or
       blocked remediation plan is terminal for this run. Pass
       `revisionPacket` inline as the JSON object returned by the final
       workflow; a file path, attachment, artifact reference, or
@@ -218,7 +223,8 @@ simultaneous writers.
       criterion evidence with the state before remediation. If none changed,
       stop with typed `no-progress`; do not spend the final rerun.
     - Launch `orchestrator:fugu-sweep-final` one final time with
-      `revisionRound: 1` and the cumulative initial plus remediation evidence.
+      the same `highAssurance`, `revisionRound: 1`, and the cumulative initial
+      plus remediation evidence.
       If it blocks, its typed stop is
       `final-audit-failed-after-remediation`. Never plan a second remediation
       cycle.
@@ -232,7 +238,12 @@ simultaneous writers.
    independently accepted sweep. If startup fails, checkpoint
    `inconclusive` with `infrastructure-failure`.
 15. Report the planned unit count, wave count, model/persona routes, accepted and
-    blocked units, resulting Git HEAD, final checks, and judgment.
+   blocked units, resulting Git HEAD, final checks, and judgment.
+
+Every paid wave must advance at least one exact acceptance criterion through a
+real commit, check, device measurement, artifact, primary-evidence finding, or
+typed actionable blocker. If a wave only repeats prior analysis, stop as
+`no-progress` before launching reviewers, remediation, or another wave.
 
 The skill is the native coordinator. Fugu routes persona/model pairs but never
 starts agents. The planner and final audit appear under `/workflows`; owner,

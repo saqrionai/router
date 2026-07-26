@@ -12,6 +12,11 @@
 - A worker returning is not completion. Require criterion-level evidence and
   the deterministic acceptance gate.
 - Keep agent calls bounded and stop on rejection, no progress, or round limits.
+- Optimize for accepted progress per model call. Default to quick forums,
+  8-unit/4-slot sweeps, one final audit plus an independent judge, and at most
+  two declared route attempts. Escalate only for explicit high assurance.
+- Across the portfolio, run paid agent work in at most two project sessions at
+  once and only one high-assurance/full/UltraCheck workflow at a time.
 - Serialize Beads writes and close an issue only after accepted evidence.
 - Run `uv run pytest -q`, `node --check
   claude-plugin/workflows/fugu-forum.js`, and `claude plugin validate

@@ -41,8 +41,11 @@ const ultracheck = Boolean(input.ultracheck) || /\bultracheck\b/i.test(task)
 const fullForum = ultracheck
   || Boolean(input.fullForum)
   || /\bfull forum\b/i.test(task)
-const quick = !fullForum && Boolean(input.quick)
-const mode = quick ? 'quick' : fullForum ? 'full' : 'standard'
+const standardForum = !fullForum && (
+  Boolean(input.standardForum) || /\bstandard forum\b/i.test(task)
+)
+const quick = !fullForum && !standardForum
+const mode = fullForum ? 'full' : standardForum ? 'standard' : 'quick'
 const workflowRunId = String(input.workflowRunId || '').trim()
 if (!workflowRunId) {
   return {
@@ -1045,6 +1048,14 @@ ${excerpt(queueSnapshot(), 12000)}
 
 ${executionBudget}
 
+${quick
+  ? `QUICK DELIVERY GATE:
+Independently inspect the resulting workspace and run the smallest decisive
+checks needed to falsify the owner's material completion claims. You are the
+independent checker; do not accept the owner's evidence without direct
+inspection.`
+  : ''}
+
 Return one criteria row for every criterion, in the same order and with the
 exact criterion text. A worker returning, editing a file, or exiting zero does
 not prove completion. Accept only direct artifact evidence or reproducible
@@ -1126,12 +1137,7 @@ claim. Progress booleans compare this round with the prior round.`, {
 
 phase('Opening posts')
 const opening = quick
-  ? [await dispatch(
-    'researcher',
-    'Build the evidence inventory before conclusions harden.',
-    null,
-    'Opening posts',
-  )]
+  ? []
   : await parallel([
     () => dispatch(
       'researcher',
@@ -1169,7 +1175,9 @@ const cross = fullForum
 phase('Artifact workshop')
 let artifact = await dispatch(
   'engineer',
-  'Use the strongest surviving claims to implement or construct the requested artifact. Do not repeat expensive checks already established by direct opening evidence; run only the smallest missing or artifact-specific check. The verification phase owns independent re-runs.',
+  quick
+    ? 'Advance the exact acceptance criteria. Gather only the evidence needed to produce the requested artifact, implementation, experiment, or typed blocker. Run the smallest decisive owner check.'
+    : 'Use the strongest surviving claims to implement or construct the requested artifact. Do not repeat expensive checks already established by direct opening evidence; run only the smallest missing or artifact-specific check. The verification phase owns independent re-runs.',
   { opening, cross },
   'Artifact workshop',
 )
@@ -1177,14 +1185,7 @@ let artifact = await dispatch(
 async function verifyAndJudge(round, artifactValue) {
   phase('Verification')
   const verification = quick
-    ? [await dispatch(
-      'verifier',
-      'Independently inspect the artifact and attempt to falsify every material completion claim.',
-      { opening, cross, artifact: artifactValue },
-      'Verification',
-      `-artifact-r${round}`,
-      round,
-    )]
+    ? []
     : await parallel([
       () => dispatch(
         'verifier',
