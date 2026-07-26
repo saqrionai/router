@@ -119,6 +119,106 @@ class BeadsBridge:
             "candidates": bounded,
         }
 
+    def prepare_frontier(
+        self,
+        workspace: Path,
+        selections: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Acquire every lease before claiming up to two frontier Beads."""
+        if not 1 <= len(selections) <= 2:
+            raise ValueError("selections must contain between 1 and 2 items")
+        workspace = workspace.expanduser().resolve()
+        beads_root = self._beads_root(workspace)
+        if beads_root is None:
+            return {
+                "enabled": False,
+                "reason": f"no .beads directory under {workspace}",
+            }
+        normalized: list[tuple[str, str, list[str]]] = []
+        for item in selections:
+            issue_id = str(item.get("issue_id") or "").strip()
+            task = str(item.get("task") or "").strip()
+            raw_acceptance = item.get("acceptance_criteria") or []
+            self._validate_issue_id(issue_id)
+            if not task:
+                raise ValueError(f"{issue_id}: task must be non-empty")
+            if not isinstance(raw_acceptance, list):
+                raise ValueError(
+                    f"{issue_id}: acceptance_criteria must be an array"
+                )
+            normalized.append(
+                (issue_id, task, [str(value) for value in raw_acceptance])
+            )
+        issue_ids = [issue_id for issue_id, _, _ in normalized]
+        if len(set(issue_ids)) != len(issue_ids):
+            raise ValueError("frontier selections must have unique issue IDs")
+
+        acquired: list[str] = []
+        with self._workspace_lock(beads_root):
+            snapshots: dict[str, dict[str, Any]] = {}
+            for issue_id in issue_ids:
+                snapshot = self.snapshot(workspace, issue_id)
+                if snapshot.get("status") not in {"open", "in_progress"}:
+                    return {
+                        "enabled": True,
+                        "launch_allowed": False,
+                        "issue_id": issue_id,
+                        "reason": (
+                            f"Bead status is {snapshot.get('status')!r}; "
+                            "explicitly reopen it before launching"
+                        ),
+                    }
+                snapshots[issue_id] = snapshot
+            for issue_id in issue_ids:
+                if not self._acquire_issue_lease(beads_root, issue_id):
+                    for acquired_id in acquired:
+                        self._release_issue_lease(beads_root, acquired_id)
+                    return {
+                        "enabled": True,
+                        "launch_allowed": False,
+                        "active_issue_ids": [issue_id],
+                        "reason": (
+                            "A selected Bead already has an active "
+                            "Orchestrator workflow"
+                        ),
+                    }
+                acquired.append(issue_id)
+            try:
+                prepared = []
+                for issue_id, task, acceptance in normalized:
+                    snapshot = snapshots[issue_id]
+                    selection = "resumed-frontier"
+                    if snapshot.get("status") == "open":
+                        self._run(
+                            workspace,
+                            ["bd", "update", issue_id, "--claim"],
+                        )
+                        snapshot = self.snapshot(workspace, issue_id)
+                        selection = "claimed-frontier"
+                    prepared.append(
+                        {
+                            "enabled": True,
+                            "launch_allowed": True,
+                            "issue_id": issue_id,
+                            "selection": selection,
+                            "resolved_task": self._resolved_task(task, snapshot),
+                            "resolved_acceptance_criteria": (
+                                self._resolved_acceptance(snapshot, acceptance)
+                            ),
+                            "snapshot": snapshot,
+                        }
+                    )
+            except Exception:
+                for issue_id in acquired:
+                    self._release_issue_lease(beads_root, issue_id)
+                raise
+        return {
+            "enabled": True,
+            "launch_allowed": True,
+            "atomic_leases": True,
+            "issues": prepared,
+        }
+
     def _prepare_locked(
         self,
         workspace: Path,

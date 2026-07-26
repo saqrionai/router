@@ -94,6 +94,68 @@ class BeadsBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "between 1 and 16"):
             bridge.frontier(Path("/tmp"), limit=17)
 
+    def test_prepare_frontier_acquires_distinct_leases_before_launch(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".beads").mkdir()
+            bridge = BeadsBridge()
+            snapshots = [
+                {"id": "one", "title": "One", "status": "open"},
+                {"id": "two", "title": "Two", "status": "open"},
+                {"id": "one", "title": "One", "status": "in_progress"},
+                {"id": "two", "title": "Two", "status": "in_progress"},
+            ]
+            with patch.object(bridge, "snapshot", side_effect=snapshots), patch.object(
+                bridge,
+                "_run",
+                return_value=SimpleNamespace(returncode=0, stdout="", stderr=""),
+            ):
+                result = bridge.prepare_frontier(
+                    root,
+                    [
+                        {"issue_id": "one", "task": "continue one"},
+                        {"issue_id": "two", "task": "continue two"},
+                    ],
+                )
+
+            self.assertTrue(result["atomic_leases"])
+            self.assertEqual(
+                [item["issue_id"] for item in result["issues"]],
+                ["one", "two"],
+            )
+            self.assertEqual(len(bridge._leases), 2)
+            bridge._release_issue_lease(root, "one")
+            bridge._release_issue_lease(root, "two")
+
+    def test_prepare_frontier_releases_partial_lease_on_conflict(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".beads").mkdir()
+            bridge = BeadsBridge()
+            other = BeadsBridge()
+            self.assertTrue(other._acquire_issue_lease(root, "two"))
+            with patch.object(
+                bridge,
+                "snapshot",
+                side_effect=[
+                    {"id": "one", "status": "in_progress"},
+                    {"id": "two", "status": "in_progress"},
+                ],
+            ):
+                result = bridge.prepare_frontier(
+                    root,
+                    [
+                        {"issue_id": "one", "task": "continue one"},
+                        {"issue_id": "two", "task": "continue two"},
+                    ],
+                )
+
+            self.assertFalse(result["launch_allowed"])
+            self.assertEqual(bridge._leases, {})
+            self.assertTrue(bridge._acquire_issue_lease(root, "one"))
+            bridge._release_issue_lease(root, "one")
+            other._release_issue_lease(root, "two")
+
     def test_resolved_task_hydrates_continue_from_bead(self) -> None:
         snapshot = {
             "id": "ios-123",

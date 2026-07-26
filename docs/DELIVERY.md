@@ -37,10 +37,14 @@ Cross-Bead scheduling and within-Bead decomposition are separate:
   concrete affected Beads and a reproducible reason. Durable issue and edge
   admission is a separate serialized operation.
 
-The current frontier planner is read-only. The forum claims and executes its
-first validated selection. Concurrent execution of a second selection remains
-disabled until isolated ownership, serial integration, and separate leases are
-implemented and tested.
+The frontier planner is read-only. One selection follows the economy-first
+forum path. Two validated selections are atomically leased and run as one
+bounded native delivery wave: direct owners run in parallel, with worktree
+isolation mandatory for every writer; one integrator applies usable
+commits serially, one independent checker per Bead runs in parallel, and the
+coordinator checkpoints each Bead serially. A
+failed sibling does not invalidate an independently accepted Bead. The wave
+stops after checkpointing; the next `continue` reranks instead of recursing.
 
 ## Conditional Capabilities
 

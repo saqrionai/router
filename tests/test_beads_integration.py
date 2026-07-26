@@ -240,3 +240,78 @@ def test_auto_selection_resumes_work_and_skips_live_lease(
 
     assert empty_result["launch_allowed"] is False
     assert empty_result["selection"] == "queue-empty"
+
+
+@pytest.mark.skipif(resolve_bd_binary() is None, reason="bd is not installed")
+def test_frontier_batch_claims_and_releases_two_real_beads(
+    tmp_path: Path,
+) -> None:
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Saqrion Test")
+    run(tmp_path, "git", "config", "user.email", "test@example.invalid")
+    run(
+        tmp_path,
+        "bd",
+        "init",
+        "--non-interactive",
+        "--skip-agents",
+        "--skip-hooks",
+        "--prefix",
+        "frontier",
+        "--quiet",
+    )
+    issue_ids = [
+        run(
+            tmp_path,
+            "bd",
+            "create",
+            title,
+            "--acceptance",
+            f"{title} is verified",
+            "--silent",
+        )
+        for title in ("Independent one", "Independent two")
+    ]
+    bridge = BeadsBridge()
+    result = bridge.prepare_frontier(
+        tmp_path,
+        [
+            {"issue_id": issue_id, "task": f"continue {issue_id}"}
+            for issue_id in issue_ids
+        ],
+    )
+
+    assert result["launch_allowed"] is True
+    assert result["atomic_leases"] is True
+    assert [item["issue_id"] for item in result["issues"]] == issue_ids
+    assert all(
+        json.loads(run(tmp_path, "bd", "show", issue_id, "--json"))[0][
+            "status"
+        ]
+        == "in_progress"
+        for issue_id in issue_ids
+    )
+
+    observer = BeadsBridge()
+    assert observer._acquire_issue_lease(tmp_path, issue_ids[0]) is False
+    bridge.checkpoint(
+        tmp_path,
+        issue_ids[0],
+        decision="revise",
+        summary="first independent result needs revision",
+        stop_reason="criterion-check-failed",
+        queue=[],
+    )
+    assert observer._acquire_issue_lease(tmp_path, issue_ids[0]) is True
+    assert observer._acquire_issue_lease(tmp_path, issue_ids[1]) is False
+    observer._release_issue_lease(tmp_path, issue_ids[0])
+    bridge.checkpoint(
+        tmp_path,
+        issue_ids[1],
+        decision="revise",
+        summary="second independent result needs revision",
+        stop_reason="criterion-check-failed",
+        queue=[],
+    )
+    assert observer._acquire_issue_lease(tmp_path, issue_ids[1]) is True
+    observer._release_issue_lease(tmp_path, issue_ids[1])

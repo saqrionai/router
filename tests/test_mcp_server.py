@@ -105,6 +105,7 @@ def test_stdio_protocol_lists_and_calls_tools(tmp_path: Path) -> None:
         "route_persona",
         "inspect_frontier",
         "prepare_bead",
+        "prepare_frontier",
         "checkpoint_bead",
     }
     assert (

@@ -7,6 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / "claude-plugin" / "workflows" / "fugu-forum.js"
 FRONTIER_WORKFLOW = ROOT / "claude-plugin" / "workflows" / "fugu-frontier.js"
+FRONTIER_FINAL = (
+    ROOT / "claude-plugin" / "workflows" / "fugu-frontier-final.js"
+)
 FRONTIER_AGENT = ROOT / "claude-plugin" / "agents" / "frontier-planner.md"
 CODEX_AGENT = ROOT / "claude-plugin" / "agents" / "codex-worker.md"
 OPUS_48_AGENT = ROOT / "claude-plugin" / "agents" / "opus-48-recovery.md"
@@ -102,6 +105,7 @@ def test_frontier_validator_rejects_overlap_and_unknown_beads() -> None:
                 "capability": "owner",
                 "writes": True,
                 "paths": ["src/one/**"],
+                "checks": ["pytest -q tests/test_one.py"],
             },
             {
                 "issueId": "two",
@@ -112,6 +116,7 @@ def test_frontier_validator_rejects_overlap_and_unknown_beads() -> None:
                 "capability": "researcher",
                 "writes": False,
                 "paths": [],
+                "checks": [],
             },
         ],
         "dependencyHypotheses": [],
@@ -130,6 +135,63 @@ def test_frontier_validator_rejects_overlap_and_unknown_beads() -> None:
         "if (validatePlan(valid, ids, 2).length) process.exit(1);\n"
         "if (!validatePlan(overlap, ids, 2).some(x => x.includes('overlapping'))) process.exit(2);\n"
         "if (!validatePlan(unknown, ids, 2).some(x => x.includes('unknown selected'))) process.exit(3);\n"
+    )
+
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        cwd=ROOT,
+    )
+
+
+def test_two_bead_delivery_uses_isolated_owners_and_parallel_checks() -> None:
+    skill = ORCHESTRATE_SKILL.read_text(encoding="utf-8")
+    final = FRONTIER_FINAL.read_text(encoding="utf-8")
+
+    assert "prepare_frontier" in skill
+    assert "atomically acquires separate process leases" in skill
+    assert "Launch both owners together" in skill
+    assert "`isolation: worktree`" in skill
+    assert "sweep-integrator" in skill
+    assert "Checkpoint the two Beads one at a time" in skill
+    assert "Do not also launch the single-Bead forum" in skill
+    assert "items.length > 2" in final
+    assert "await parallel(calls)" in final
+    assert final.count("await agent(") == 1
+    assert "criterionErrors" in final
+    assert "owner commit is not present in serial integration evidence" in final
+    assert "writing owner returned no check evidence" in final
+    assert "result.decision === 'accept'" in final
+
+
+def test_frontier_final_gate_requires_exact_supported_criteria() -> None:
+    source = FRONTIER_FINAL.read_text(encoding="utf-8")
+    start = source.index("function criterionErrors")
+    end = source.index("\n\nasync function checkItem", start)
+    validator = source[start:end]
+    expected = ["focused test passes", "artifact exists"]
+    passing = [
+        {
+            "criterion": "focused test passes",
+            "status": "passed",
+            "evidence": ["pytest: 1 passed"],
+        },
+        {
+            "criterion": "artifact exists",
+            "status": "passed",
+            "evidence": ["src/artifact.py:1"],
+        },
+    ]
+    unsupported = json.loads(json.dumps(passing))
+    unsupported[1]["evidence"] = []
+    script = (
+        f"{validator}\n"
+        f"const expected = {json.dumps(expected)};\n"
+        f"const passing = {json.dumps(passing)};\n"
+        f"const unsupported = {json.dumps(unsupported)};\n"
+        "if (criterionErrors(passing, expected).length) process.exit(1);\n"
+        "if (!criterionErrors(unsupported, expected).some(x => x.includes('lacks direct evidence'))) process.exit(2);\n"
+        "if (!criterionErrors([], []).some(x => x.includes('no acceptance criteria'))) process.exit(3);\n"
     )
 
     subprocess.run(

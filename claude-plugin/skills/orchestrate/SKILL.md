@@ -5,12 +5,19 @@ disable-model-invocation: true
 allowed-tools:
   - Workflow
   - Workflow(orchestrator:fugu-frontier)
+  - Workflow(orchestrator:fugu-frontier-final)
   - Workflow(orchestrator:fugu-forum)
   - mcp__plugin_orchestrator_fugu__route_team
   - mcp__plugin_orchestrator_fugu__inspect_frontier
   - mcp__plugin_orchestrator_fugu__prepare_bead
+  - mcp__plugin_orchestrator_fugu__prepare_frontier
   - mcp__plugin_orchestrator_fugu__checkpoint_bead
-  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:frontier-planner)
+  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:frontier-planner, orchestrator:sweep-opus-worker, orchestrator:sweep-codex-worker, orchestrator:sweep-integrator)
+  - TaskCreate
+  - TaskUpdate
+  - TaskGet
+  - TaskOutput
+  - TaskStop
 ---
 
 # Orchestrator
@@ -36,6 +43,87 @@ If the task is empty, ask for it. Otherwise:
    exact errors. With one candidate, use its ID directly. With no candidates,
    let preparation decide whether a specific new task should create a Bead or
    whether a generic continuation is complete.
+   When the validated plan selects two Beads, use the delivery fan-out below
+   and return after its checkpoints. Do not also launch the single-Bead forum.
+
+### Two-Bead Delivery Fan-Out
+
+1. Call `mcp__plugin_orchestrator_fugu__prepare_frontier` once with the two
+   selected IDs, exact operator instruction, and supplied acceptance criteria.
+   This atomically acquires separate process leases before either run starts.
+   Stop if both leases are not granted; never fall back to untracked work.
+2. Use each returned issue's distinct `resolved_task`,
+   `resolved_acceptance_criteria`, and snapshot. Call `route_team` separately
+   for each task and preserve separate workflow run IDs. Choose the owner route
+   from the planner capability, using engineer for writing work and researcher
+   for a read-only default. Fable cannot own writes or operational security.
+3. Require a clean main checkout except `.claude/worktrees/**`, record its
+   exact HEAD, and require effective `worktree.baseRef: "head"` before writing.
+   If any preflight fails, checkpoint both issues as `inconclusive` with
+   `infrastructure-failure`, releasing their leases.
+4. Create one native task per Bead. Launch both owners together in one direct
+   top-level Agent fan-out, never through `Workflow.agent()`:
+   - writing Opus route: `orchestrator:sweep-opus-worker` with
+     `isolation: worktree`;
+   - writing GPT route: `orchestrator:sweep-codex-worker` with
+     `isolation: worktree`; and
+   - read-only route: its normal Fugu agent without isolation.
+
+   Supply the Bead ID as the unit ID, main workspace, planned base SHA, exact
+   task and criteria, planner-declared paths and checks, authorization, and
+   routed model. One owner has exclusive responsibility for one Bead. Workers
+   must not invoke `bd` or read `.beads`. A writing result is usable only when
+   it comes from a linked worktree distinct from main, started at the exact
+   base SHA, changed only declared paths, ran every declared check, and
+   produced one real descendant commit. Require this result shape:
+
+```json
+{
+  "status": "completed|blocked|failed",
+  "unitId": "bead-id",
+  "summary": "observed result",
+  "branch": "worktree branch",
+  "worktree": "absolute path",
+  "baseSha": "planned sha",
+  "commitSha": "real sha or empty",
+  "changedPaths": [],
+  "claims": [],
+  "evidence": [],
+  "checks": [],
+  "unresolved": [],
+  "nextActions": []
+}
+```
+
+5. Poll only the exact opaque native IDs returned by launch. Output, token,
+   tool, task-status, process-supervisor, and Git growth are heartbeats. After
+   ten minutes with no signal, stop only that owner and continue the unrelated
+   one. There is no automatic owner retry in this economy-first path.
+6. After both owners terminate, launch exactly one
+   `orchestrator:sweep-integrator` Agent in main. Give it only usable writing
+   commits, declared path scopes, the common base SHA, and the union of focused
+   checks. It must inspect and cherry-pick commits serially in frontier order,
+   stop on any conflict or unexpected path, and return `status`,
+   `integratedCommits`, resulting HEAD, changed paths, conflicts, and checks.
+   Read-only owner evidence bypasses Git integration.
+7. Invoke `orchestrator:fugu-frontier-final` once with the workspace,
+   integration result, and both items. Each item contains its issue ID,
+   resolved task, exact acceptance array, `writes`, security flag, route
+   assignments, and owner result. The workflow runs one independent checker
+   per Bead in parallel and applies a deterministic exact-criterion gate. It
+   does not buy a standing research or judge panel and performs no repair.
+8. Checkpoint the two Beads one at a time with their separate workflow run IDs.
+   Build each queue from its owner and checker with real persona, model,
+   status, evidence, and route attempt. Use `accept` only for that item's
+   deterministic acceptance; otherwise use `revise` for a task-level failure
+   or `inconclusive` for infrastructure failure. A failed sibling never
+   downgrades an accepted independent Bead. Checkpoint order follows frontier
+   order so Beads history and lease release are deterministic.
+9. Report both Bead outcomes, commits, integration checks, checker routes, and
+   smallest remaining blockers. Then stop. The next `continue` reranks the
+   frontier from the newly persisted state rather than recursing in one
+   context.
+
 3. Call `mcp__plugin_orchestrator_fugu__prepare_bead` with the absolute
    workspace, exact user instruction, initial acceptance criteria, and the
    supplied or frontier-selected issue ID. Without an ID, intake remains

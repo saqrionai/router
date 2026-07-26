@@ -117,6 +117,13 @@ function validatePlan(plan, candidateIds, selectionLimit) {
     } else if (!item.writes && item.paths.length) {
       errors.push(`${id}: read-only work cannot claim write paths`)
     }
+    if (!Array.isArray(item.checks)) {
+      errors.push(`${id}: checks must be an array`)
+    } else if (item.writes && !item.checks.length) {
+      errors.push(`${id}: writing work requires at least one real check`)
+    } else if (item.checks.some(check => !String(check).trim())) {
+      errors.push(`${id}: check commands must be non-empty`)
+    }
   }
   for (let left = 0; left < plan.selected.length; left++) {
     for (let right = left + 1; right < plan.selected.length; right++) {
@@ -163,7 +170,7 @@ for missing evidence; verifier for risky closure claims; challenger for
 contradictory evidence or repeated failure; specialist for a concrete domain
 need. Dependency observations are hypotheses only and require cited evidence.
 Return exactly one JSON object with this shape and no Markdown fence:
-{"status":"completed|blocked","summary":"...","selected":[{"issueId":"...","reason":"...","firstStep":"...","expectedEvidence":"...","risk":"low|medium|high|critical","capability":"owner|researcher|verifier|challenger|specialist","writes":true,"paths":["relative/path/**"]}],"dependencyHypotheses":[{"issueId":"...","dependsOnId":"...","confidence":"low|medium|high","evidence":"..."}]}`, {
+{"status":"completed|blocked","summary":"...","selected":[{"issueId":"...","reason":"...","firstStep":"...","expectedEvidence":"...","risk":"low|medium|high|critical","capability":"owner|researcher|verifier|challenger|specialist","writes":true,"paths":["relative/path/**"],"checks":["real focused command"]}],"dependencyHypotheses":[{"issueId":"...","dependsOnId":"...","confidence":"low|medium|high","evidence":"..."}]}`, {
   label: 'frontier-planner',
   phase: 'Inspect frontier',
   agentType: 'orchestrator:frontier-planner',

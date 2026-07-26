@@ -145,6 +145,37 @@ class FuguMcpServer:
                 },
             },
             {
+                "name": "prepare_frontier",
+                "description": (
+                    "Acquire all leases before claiming one or two explicit "
+                    "independent frontier Beads for a native delivery fan-out."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["workspace", "selections"],
+                    "properties": {
+                        "workspace": {"type": "string", "minLength": 1},
+                        "selections": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 2,
+                            "items": {
+                                "type": "object",
+                                "required": ["issue_id", "task"],
+                                "properties": {
+                                    "issue_id": {"type": "string"},
+                                    "task": {"type": "string"},
+                                    "acceptance_criteria": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            {
                 "name": "checkpoint_bead",
                 "description": (
                     "Append one native-workflow checkpoint to a Bead and close "
@@ -341,6 +372,14 @@ class FuguMcpServer:
                 [str(item) for item in raw_acceptance],
                 issue_id,
             )
+        if name == "prepare_frontier":
+            raw_selections = arguments.get("selections")
+            if not isinstance(raw_selections, list) or not all(
+                isinstance(item, dict) for item in raw_selections
+            ):
+                raise ValueError("selections must be an array of objects")
+            workspace = Path(str(arguments.get("workspace") or "")).expanduser()
+            return self.beads.prepare_frontier(workspace, raw_selections)
         if name == "checkpoint_bead":
             raw_queue = arguments.get("queue")
             if not isinstance(raw_queue, list) or not all(

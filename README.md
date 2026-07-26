@@ -116,9 +116,10 @@ creating a placeholder. The skill appends one serialized checkpoint after the
 native workflow returns and closes the issue only after deterministic
 acceptance.
 
-Frontier selection is currently single-execution: a second independent
-candidate may be reported by planning but is not claimed until isolated
-cross-Bead execution is enabled. See [`docs/DELIVERY.md`](docs/DELIVERY.md).
+When the planner proves two candidates independent, Orchestrator atomically
+leases them, launches one direct owner per Bead in parallel with every writer
+isolated, integrates usable commits serially, and independently checks and
+checkpoints each result. See [`docs/DELIVERY.md`](docs/DELIVERY.md).
 
 ## Completion Contract
 

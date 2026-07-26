@@ -37,6 +37,13 @@ planner. It selects one by default and may identify a second independent
 candidate. See `DELIVERY.md`. This choice layer does not mutate Beads and is not
 another scheduler.
 
+When two candidates survive deterministic scope validation, the coordinator
+atomically leases both, launches one direct isolated owner per Bead, and uses
+the same serial integrator proven by sweep. A read-only final workflow checks
+both resulting Beads in parallel and JavaScript gates exact acceptance before
+the coordinator writes their checkpoints one at a time. The run does not add a
+standing panel or recurse; the persisted frontier is reranked on the next turn.
+
 The Python routing package cannot start, resume, stop, or simulate workflow
 workers. There is no alternate API, dashboard scheduler, or model gateway. A
 plugin-local process supervisor observes one already-assigned external adapter
