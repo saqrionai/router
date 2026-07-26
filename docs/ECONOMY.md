@@ -27,7 +27,8 @@ blocker, or a no-progress stop. Do not keep five speculative forums running.
 1. **Direct turn**: one narrow edit, check, or device action. No forum.
 2. **Quick forum**: default for one substantial artifact. One owner gathers the
    evidence needed to advance it; one independent checker inspects the result
-   criterion by criterion. No standing research panel and no revision.
+   criterion by criterion. No standing research panel. One targeted revision
+   is permitted only after an actionable evidence-backed failure.
 3. **Standard forum**: explicit `standard forum`; adds competing opening and
    verification perspectives and permits one revision.
 4. **Full forum / UltraCheck**: explicit only. Use for contradictory evidence,

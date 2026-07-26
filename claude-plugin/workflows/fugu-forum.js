@@ -53,7 +53,7 @@ if (!workflowRunId) {
     reason: 'fugu-forum requires args.workflowRunId from Fugu route_team',
   }
 }
-const defaultMaxRounds = quick ? 1 : fullForum ? 3 : 2
+const defaultMaxRounds = fullForum ? 3 : 2
 const maxRoundCeiling = defaultMaxRounds
 const maxRounds = Math.max(
   1,

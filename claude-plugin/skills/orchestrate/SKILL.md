@@ -53,8 +53,9 @@ If the task is empty, ask for it. Otherwise:
    - `standard`: only when the task contains `standard forum`; and
    - `full`: only when the task contains `full forum`.
    Quick mode runs one owner and one independent criterion checker, with no
-   mandatory opening panel and no revision. The owner gathers research only as
-   needed to advance the artifact.
+   mandatory opening panel. If the checker returns an actionable,
+   evidence-backed failure, it permits one targeted owner/checker revision.
+   The owner gathers research only as needed to advance the artifact.
    Standard mode runs two parallel opening units, one artifact writer, two
    parallel verification units, and one judge, with at most one revision.
    Full mode additionally runs parallel cross-examination and allows at most
@@ -81,14 +82,15 @@ If the task is empty, ask for it. Otherwise:
   "standardForum": false,
   "fullForum": false,
   "ultracheck": false,
-  "maxRounds": 1,
+  "maxRounds": 2,
   "noProgressLimit": 2
 }
 ```
 
-Use `maxRounds: 1` for quick, `2` for standard, and `3` for full or
-UltraCheck. The workflow enforces these ceilings even if a larger value is
-supplied.
+Use `maxRounds: 2` for quick or standard and `3` for full or UltraCheck. Quick
+normally ends after its two-call first round; its second round runs only after
+an actionable, evidence-backed checker failure. The workflow enforces these
+ceilings even if a larger value is supplied.
 
 8. Tell the user the selected Bead and whether it was resumed, claimed, or
    created. The run is visible in `/workflows`. This is the only execution

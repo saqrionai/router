@@ -33,8 +33,10 @@ Do not edit files.
 ```
 
 Quick mode runs one artifact owner and one independent criterion checker, with
-no standing research panel and no revision wave. The owner gathers evidence as
-needed. This is the economy-first default for a substantial single artifact.
+no standing research panel. The owner gathers evidence as needed. A clean run
+ends after those two calls; an actionable checker failure permits one targeted
+owner/checker revision. This is the economy-first default for a substantial
+single artifact.
 
 ## Standard Forum
 

@@ -21,7 +21,7 @@ def test_workflow_modes_have_bounded_graph_and_queue_evidence() -> None:
     assert "const quick = !fullForum && !standardForum" in source
     assert "const fullForum = ultracheck" in source
     assert "const mode = fullForum ? 'full' : standardForum ? 'standard' : 'quick'" in source
-    assert "quick ? 1 : fullForum ? 3 : 2" in source
+    assert "const defaultMaxRounds = fullForum ? 3 : 2" in source
     assert "const cross = fullForum" in source
     assert "const opening = quick" in source
     assert "const verification = quick" in source

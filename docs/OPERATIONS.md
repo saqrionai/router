@@ -115,8 +115,8 @@ pausing, stopping, and resumption. Select an agent and press `x` to stop it or
 Native progress is saved by Claude Code.
 There is no local API worker, background dashboard scheduler, or LaunchAgent.
 
-The standard workflow permits at most two rounds: the initial artifact and one
-evidence-backed revision. Quick mode permits one round. Explicit `full forum`
+The quick and standard workflows permit at most two rounds: the initial
+artifact and one actionable evidence-backed revision. Explicit `full forum`
 and UltraCheck permit at most three rounds. Every mode stops after two
 consecutive no-progress revisions. A worker returning successfully only changes
 its queue unit to `returned`; it does not accept the task.
@@ -127,7 +127,7 @@ no-signal machine check only once, and must keep a shell command's combined
 declared worst-case runtime below 90 seconds. A second no-signal result ends
 testing and returns a blocked or partial result instead of consuming another
 verification loop. Quick mode is the default: one artifact owner, one
-independent criterion checker, and no revision. Ask for `standard forum` to
+independent criterion checker, and at most one targeted revision. Ask for `standard forum` to
 use two parallel opening units, two parallel verification units, and at most
 one revision. Ask for `full forum` only for ambiguous, adversarial, or broad
 work; it adds parallel cross-examination and

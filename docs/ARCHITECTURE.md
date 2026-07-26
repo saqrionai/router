@@ -49,7 +49,8 @@ escalation and uses:
 5. at most one revision when the judge returns actionable blockers.
 
 Quick mode uses one artifact owner and one independent criterion checker with
-no revision. Explicit full mode adds parallel exploit analysis and
+one targeted revision only after an actionable evidence-backed failure.
+Explicit full mode adds parallel exploit analysis and
 adversarial cross-examination and permits at most two revisions. UltraCheck
 uses the full graph and adds broad checks, a clean-process rerun, refutation
 hypotheses, hostile-input categories, and a claim-level evidence ledger.
