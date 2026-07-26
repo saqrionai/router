@@ -31,6 +31,12 @@ Orchestrator adds four support boundaries:
 | Agent telemetry | Normalize native hook events and supervise process-backed adapters |
 | Beads bridge | Durable intake, dependencies, acceptance criteria, and checkpoint |
 
+Before intake claims one issue, the delivery frontier can expose up to eight
+ranked in-progress or dependency-ready Beads to one bounded read-only native
+planner. It selects one by default and may identify a second independent
+candidate. See `DELIVERY.md`. This choice layer does not mutate Beads and is not
+another scheduler.
+
 The Python routing package cannot start, resume, stop, or simulate workflow
 workers. There is no alternate API, dashboard scheduler, or model gateway. A
 plugin-local process supervisor observes one already-assigned external adapter

@@ -41,6 +41,59 @@ class BeadsBridgeTests(unittest.TestCase):
             ["ios-active-p1-new", "ios-active-p1-old", "ios-ready-p0"],
         )
 
+    def test_frontier_is_bounded_ranked_deduplicated_and_read_only(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".beads").mkdir()
+            bridge = BeadsBridge()
+            candidates = [
+                {
+                    "id": "ready-p0",
+                    "title": "Ready delivery",
+                    "status": "open",
+                    "priority": 0,
+                    "updated_at": "2026-07-24T16:00:00Z",
+                    "description": "x" * 5_000,
+                    "dependencies": [{"id": "closed-base"}],
+                },
+                {
+                    "id": "active-p1",
+                    "title": "Active delivery",
+                    "status": "in_progress",
+                    "priority": 1,
+                    "updated_at": "2026-07-23T16:00:00Z",
+                },
+                {
+                    "id": "active-p1",
+                    "title": "Duplicate from ready output",
+                    "status": "open",
+                    "priority": 1,
+                    "updated_at": "2026-07-23T16:00:00Z",
+                },
+            ]
+            with patch.object(
+                bridge,
+                "_selection_candidates",
+                return_value=(candidates, {"in_progress": 1, "ready": 2}),
+            ):
+                result = bridge.frontier(root, limit=2)
+
+        self.assertTrue(result["read_only"])
+        self.assertEqual(result["eligible_count"], 2)
+        self.assertEqual(
+            [item["id"] for item in result["candidates"]],
+            ["active-p1", "ready-p0"],
+        )
+        self.assertEqual(len(result["candidates"][1]["description"]), 4_000)
+        self.assertEqual(result["candidates"][1]["dependency_count"], 1)
+        self.assertEqual(bridge._leases, {})
+
+    def test_frontier_rejects_unbounded_limits(self) -> None:
+        bridge = BeadsBridge()
+
+        with self.assertRaisesRegex(ValueError, "between 1 and 16"):
+            bridge.frontier(Path("/tmp"), limit=17)
+
     def test_resolved_task_hydrates_continue_from_bead(self) -> None:
         snapshot = {
             "id": "ios-123",

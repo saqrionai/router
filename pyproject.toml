@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "model-orchestrator"
-version = "0.16.1"
+version = "0.17.0"
 description = "Evidence-driven multi-model orchestration for authorized security research and engineering"
 readme = "README.md"
 requires-python = ">=3.11"

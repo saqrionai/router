@@ -103,6 +103,7 @@ def test_stdio_protocol_lists_and_calls_tools(tmp_path: Path) -> None:
     assert tool_names == {
         "route_team",
         "route_persona",
+        "inspect_frontier",
         "prepare_bead",
         "checkpoint_bead",
     }
@@ -133,6 +134,18 @@ def test_prepare_bead_is_disabled_outside_a_beads_workspace(
             "task": "verify the native workflow",
             "acceptanceCriteria": ["the native workflow passes"],
         },
+    )
+
+    assert payload["enabled"] is False
+    assert "no .beads directory" in payload["reason"]
+
+
+def test_inspect_frontier_is_read_only_and_disabled_outside_beads(
+    tmp_path: Path,
+) -> None:
+    payload = server(tmp_path).call_tool(
+        "inspect_frontier",
+        {"workspace": str(tmp_path), "limit": 8},
     )
 
     assert payload["enabled"] is False

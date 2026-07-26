@@ -4,11 +4,13 @@ description: Run substantial research, security engineering, implementation, deb
 disable-model-invocation: true
 allowed-tools:
   - Workflow
+  - Workflow(orchestrator:fugu-frontier)
   - Workflow(orchestrator:fugu-forum)
   - mcp__plugin_orchestrator_fugu__route_team
+  - mcp__plugin_orchestrator_fugu__inspect_frontier
   - mcp__plugin_orchestrator_fugu__prepare_bead
   - mcp__plugin_orchestrator_fugu__checkpoint_bead
-  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker)
+  - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:frontier-planner)
 ---
 
 # Orchestrator
@@ -21,15 +23,28 @@ If the task is empty, ask for it. Otherwise:
 
 1. Extract acceptance criteria explicitly supplied by the user. For a generic
    request such as `continue`, do not invent a new scope before reading Beads.
-2. Call `mcp__plugin_orchestrator_fugu__prepare_bead` with the absolute
-   workspace, exact user instruction, initial acceptance criteria, and an
-   explicit Bead ID only when the user supplied one. With no ID, intake is
-   automatic and deterministic: resume the highest-priority `in_progress`
-   item, otherwise claim the highest-priority dependency-ready item, breaking
-   ties by most recent update and then ID. The MCP holds a process lease so
-   another live client skips that Bead. It creates a dedicated Bead only when
-   no resumable or ready candidate exists.
-3. Read `resolved_task`, `resolved_acceptance_criteria`, `selection`, and the
+2. When the user did not supply a Bead ID, call
+   `mcp__plugin_orchestrator_fugu__inspect_frontier` with the absolute
+   workspace and `limit: 8`. This is read-only and does not claim work. If it
+   returns multiple candidates, invoke the native `orchestrator:fugu-frontier`
+   workflow with the exact user instruction, workspace, returned candidates,
+   and `maxSelected: 2`. Use the first validated selection as the issue ID for
+   this run. The second selection is an independence candidate only: do not
+   claim or execute it until the parallel frontier executor owns isolated
+   work. Do not persist planner dependency hypotheses; they require separate
+   evidence admission. If the plan is blocked or invalid, stop and report its
+   exact errors. With one candidate, use its ID directly. With no candidates,
+   let preparation decide whether a specific new task should create a Bead or
+   whether a generic continuation is complete.
+3. Call `mcp__plugin_orchestrator_fugu__prepare_bead` with the absolute
+   workspace, exact user instruction, initial acceptance criteria, and the
+   supplied or frontier-selected issue ID. Without an ID, intake remains
+   deterministic: resume the highest-priority `in_progress` item, otherwise
+   claim the highest-priority dependency-ready item, breaking ties by most
+   recent update and then ID. The MCP holds a process lease so another live
+   client skips that Bead. It creates a dedicated Bead only when no resumable
+   or ready candidate exists.
+4. Read `resolved_task`, `resolved_acceptance_criteria`, `selection`, and the
    selected `snapshot` from preparation. Use the resolved values from this
    point forward; they hydrate a vague `continue` request with the Bead title,
    description, design, notes, and acceptance contract. Add criteria required
@@ -38,7 +53,7 @@ If the task is empty, ask for it. Otherwise:
    without durable tracking. If `launch_allowed` is false, do not create a
    duplicate run; report the active candidate IDs and direct the user to the
    existing native workflow.
-4. Select the routing profile, then call
+5. Select the routing profile, then call
    `mcp__plugin_orchestrator_fugu__route_team` with `resolved_task` and that
    workflow. Use `security-research-forum` whenever the task or hydrated Bead
    involves security, vulnerability research, reverse engineering, firmware,
@@ -46,7 +61,7 @@ If the task is empty, ask for it. Otherwise:
    or any authorization-required target. Use `general-forum` only when the
    work is clearly non-security. Do not hand-select models before seeing the
    route plan.
-5. Extract the returned `workflow_run_id` and `assignments`. Preserve each
+6. Extract the returned `workflow_run_id` and `assignments`. Preserve each
    assignment's persona, model, `agent_type`, fallbacks, and reasons.
    Select one explicit execution mode:
    - `quick`: the economy-first default;
@@ -64,10 +79,10 @@ If the task is empty, ask for it. Otherwise:
    set `ultracheck` and `fullForum` to `true`; the workflow will require a
    clean-process rerun, broad project checks, at least five refutation
    hypotheses, and a claim-level evidence ledger.
-6. For security work, include the user's actual authorization and target
+7. For security work, include the user's actual authorization and target
    boundary. If no authorization is present, restrict execution to analysis of
    local artifacts and defensive engineering.
-7. Invoke the native `orchestrator:fugu-forum` workflow with structured args:
+8. Invoke the native `orchestrator:fugu-forum` workflow with structured args:
 
 ```json
 {
@@ -92,10 +107,10 @@ normally ends after its two-call first round; its second round runs only after
 an actionable, evidence-backed checker failure. The workflow enforces these
 ceilings even if a larger value is supplied.
 
-8. Tell the user the selected Bead and whether it was resumed, claimed, or
+9. Tell the user the selected Bead and whether it was resumed, claimed, or
    created. The run is visible in `/workflows`. This is the only execution
    plane; never launch an external scheduler.
-9. When the native workflow returns and Beads is enabled, call
+10. When the native workflow returns and Beads is enabled, call
    `mcp__plugin_orchestrator_fugu__checkpoint_bead` with its decision, summary,
    exact task, `workflowRunId`, `stopReason`, and queue. This write is
    serialized and also records idempotent per-route outcomes for Fugu. Close the
@@ -103,7 +118,7 @@ ceilings even if a larger value is supplied.
    routing or workflow startup fails after preparation, checkpoint
    `inconclusive` with stop reason `infrastructure-failure` and an empty queue;
    this keeps the Bead in progress while releasing its live-client lease.
-10. Report the judgment, stop reason, queue totals, routed models, and real
+11. Report the judgment, stop reason, queue totals, routed models, and real
    verification results. A blocked, rejected, no-progress, round-limited, or
    inconclusive result is not success.
 

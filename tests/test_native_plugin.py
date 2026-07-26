@@ -6,6 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / "claude-plugin" / "workflows" / "fugu-forum.js"
+FRONTIER_WORKFLOW = ROOT / "claude-plugin" / "workflows" / "fugu-frontier.js"
+FRONTIER_AGENT = ROOT / "claude-plugin" / "agents" / "frontier-planner.md"
 CODEX_AGENT = ROOT / "claude-plugin" / "agents" / "codex-worker.md"
 OPUS_48_AGENT = ROOT / "claude-plugin" / "agents" / "opus-48-recovery.md"
 ORCHESTRATE_SKILL = (
@@ -55,13 +57,86 @@ def test_codex_adapter_is_one_call_and_non_git_safe() -> None:
 def test_orchestrate_skill_defaults_to_automatic_bead_intake() -> None:
     source = ORCHESTRATE_SKILL.read_text(encoding="utf-8")
 
-    assert "With no ID, intake is" in source
+    assert "Without an ID, intake remains" in source
     assert "highest-priority `in_progress`" in source
     assert "`resolved_task`" in source
-    assert "another live client skips that Bead" in source
+    assert "another live" in source
+    assert "client skips that Bead" in source
     assert "`quick`: the economy-first default" in source
     assert "`standard`: only when" in source
     assert "Full mode additionally runs parallel cross-examination" in source
+    assert "inspect_frontier" in source
+    assert "fugu-frontier" in source
+    assert "The second selection is an independence candidate only" in source
+
+
+def test_frontier_planner_is_bounded_read_only_and_single_attempt() -> None:
+    workflow = FRONTIER_WORKFLOW.read_text(encoding="utf-8")
+    agent = FRONTIER_AGENT.read_text(encoding="utf-8")
+
+    assert "maxTurns: 6" in agent
+    assert "effort: low" in agent
+    assert "Do not edit files, claim or update Beads" in agent
+    assert "Use at most three" in agent
+    assert workflow.count("await agent(") == 1
+    assert "Math.min(Number(input.maxSelected || 2), 2)" in workflow
+    assert "overlapping write scopes" in workflow
+    assert "dependencyHypotheses" in workflow
+
+
+def test_frontier_validator_rejects_overlap_and_unknown_beads() -> None:
+    source = FRONTIER_WORKFLOW.read_text(encoding="utf-8")
+    start = source.index("function normalPath")
+    end = source.index("\n\nphase('Inspect frontier')")
+    helpers = source[start:end]
+    valid = {
+        "status": "completed",
+        "summary": "advance independent deliverables",
+        "selected": [
+            {
+                "issueId": "one",
+                "reason": "highest value",
+                "firstStep": "edit one",
+                "expectedEvidence": "focused test",
+                "risk": "medium",
+                "capability": "owner",
+                "writes": True,
+                "paths": ["src/one/**"],
+            },
+            {
+                "issueId": "two",
+                "reason": "independent unblock",
+                "firstStep": "inspect two",
+                "expectedEvidence": "trace",
+                "risk": "low",
+                "capability": "researcher",
+                "writes": False,
+                "paths": [],
+            },
+        ],
+        "dependencyHypotheses": [],
+    }
+    overlap = json.loads(json.dumps(valid))
+    overlap["selected"][1]["writes"] = True
+    overlap["selected"][1]["paths"] = ["src/one/nested/**"]
+    unknown = json.loads(json.dumps(valid))
+    unknown["selected"][1]["issueId"] = "missing"
+    script = (
+        f"{helpers}\n"
+        "const ids = new Set(['one', 'two']);\n"
+        f"const valid = {json.dumps(valid)};\n"
+        f"const overlap = {json.dumps(overlap)};\n"
+        f"const unknown = {json.dumps(unknown)};\n"
+        "if (validatePlan(valid, ids, 2).length) process.exit(1);\n"
+        "if (!validatePlan(overlap, ids, 2).some(x => x.includes('overlapping'))) process.exit(2);\n"
+        "if (!validatePlan(unknown, ids, 2).some(x => x.includes('unknown selected'))) process.exit(3);\n"
+    )
+
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        cwd=ROOT,
+    )
 
 
 def test_mcp_launcher_pins_current_beads_without_overriding_operator() -> None:

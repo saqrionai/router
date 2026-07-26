@@ -79,6 +79,46 @@ class BeadsBridge:
                 issue_id,
             )
 
+    def frontier(self, workspace: Path, limit: int = 8) -> dict[str, Any]:
+        """Return a bounded, deterministic Bead frontier without claiming work."""
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise ValueError("limit must be an integer")
+        if limit < 1 or limit > 16:
+            raise ValueError("limit must be between 1 and 16")
+        workspace = workspace.expanduser().resolve()
+        beads_root = self._beads_root(workspace)
+        if beads_root is None:
+            return {
+                "enabled": False,
+                "reason": f"no .beads directory under {workspace}",
+            }
+        with self._workspace_lock(beads_root):
+            candidates, candidate_counts = self._selection_candidates(workspace)
+        ranked = self.rank_candidates(candidates)
+        unique: dict[str, dict[str, Any]] = {}
+        for candidate in ranked:
+            issue_id = str(candidate.get("id") or "")
+            self._validate_issue_id(issue_id)
+            unique.setdefault(issue_id, candidate)
+        bounded = [
+            self._frontier_candidate(candidate)
+            for candidate in list(unique.values())[:limit]
+        ]
+        return {
+            "enabled": True,
+            "workspace": str(workspace),
+            "candidate_counts": candidate_counts,
+            "eligible_count": len(unique),
+            "returned_count": len(bounded),
+            "limit": limit,
+            "ranking": (
+                "in_progress first, then priority ascending, updated_at "
+                "descending, and issue id ascending"
+            ),
+            "read_only": True,
+            "candidates": bounded,
+        }
+
     def _prepare_locked(
         self,
         workspace: Path,
@@ -311,6 +351,42 @@ class BeadsBridge:
             values.extend(line.removeprefix("-").strip() for line in lines)
         values.extend(item.strip() for item in supplied)
         return list(dict.fromkeys(item for item in values if item))
+
+    @classmethod
+    def _frontier_candidate(
+        cls, candidate: dict[str, Any]
+    ) -> dict[str, Any]:
+        dependencies = candidate.get("dependencies")
+        dependents = candidate.get("dependents")
+        bounded: dict[str, Any] = {}
+        for field in (
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "assignee",
+            "updated_at",
+        ):
+            value = candidate.get(field)
+            if value not in (None, "", [], {}):
+                bounded[field] = value
+        for field in ("description", "acceptance_criteria"):
+            value = candidate.get(field)
+            if isinstance(value, str) and value:
+                bounded[field] = value[:4_000]
+            elif isinstance(value, list):
+                bounded[field] = [str(item)[:1_000] for item in value[:20]]
+        if isinstance(dependencies, list):
+            bounded["dependencies"] = dependencies[:20]
+            bounded["dependency_count"] = len(dependencies)
+        else:
+            bounded["dependency_count"] = 0
+        if isinstance(dependents, list):
+            bounded["dependent_count"] = len(dependents)
+        else:
+            bounded["dependent_count"] = 0
+        return bounded
 
     @contextmanager
     def _workspace_lock(self, beads_root: Path) -> Iterator[None]:

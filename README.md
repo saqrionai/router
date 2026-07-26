@@ -14,7 +14,8 @@ Orchestrator contributes:
 - independent criterion-level verification and judgment;
 - no-progress and round-budget stops;
 - structural UltraCheck gates;
-- serialized Beads intake and result checkpoints; and
+- serialized Beads intake and result checkpoints;
+- delivery-first best-first selection across the ready Beads frontier; and
 - normalized native lifecycle and tool telemetry.
 
 This repository is Saqrion's internal engineering harness. It is not the
@@ -105,13 +106,19 @@ it; press `p` to pause or resume the run. Claude Code saves workflow progress
 for session resumption.
 
 In a repository with `.beads`, the skill first resumes the highest-priority
-in-progress item. If none exists, it claims the highest-priority
-dependency-ready item. Priority ties use most recent update and then issue ID.
+in-progress item or claims the highest-priority dependency-ready item. When
+multiple candidates exist, one bounded read-only native planner may refine the
+choice from repository evidence before any issue is claimed. Priority ties use
+most recent update and then issue ID.
 A process-held lease prevents live clients from selecting the same Bead. An
 explicit ID is only an override. An empty queue stops cleanly rather than
 creating a placeholder. The skill appends one serialized checkpoint after the
 native workflow returns and closes the issue only after deterministic
 acceptance.
+
+Frontier selection is currently single-execution: a second independent
+candidate may be reported by planning but is not claimed until isolated
+cross-Bead execution is enabled. See [`docs/DELIVERY.md`](docs/DELIVERY.md).
 
 ## Completion Contract
 

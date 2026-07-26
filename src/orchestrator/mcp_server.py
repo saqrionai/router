@@ -102,6 +102,26 @@ class FuguMcpServer:
                 },
             },
             {
+                "name": "inspect_frontier",
+                "description": (
+                    "Return a bounded deterministic view of in-progress and "
+                    "dependency-ready Beads without claiming or mutating work."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["workspace"],
+                    "properties": {
+                        "workspace": {"type": "string", "minLength": 1},
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 16,
+                            "default": 8,
+                        },
+                    },
+                },
+            },
+            {
                 "name": "prepare_bead",
                 "description": (
                     "Automatically resume the highest-priority in-progress Bead, "
@@ -302,6 +322,10 @@ class FuguMcpServer:
                 ],
                 "recovery_routes": list(recovery_models),
             }
+        if name == "inspect_frontier":
+            workspace = Path(str(arguments.get("workspace") or "")).expanduser()
+            limit = arguments.get("limit", 8)
+            return self.beads.frontier(workspace, limit)
         if name == "prepare_bead":
             workspace = Path(str(arguments.get("workspace") or "")).expanduser()
             task = str(arguments.get("task") or "").strip()
