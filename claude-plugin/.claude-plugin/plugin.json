@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "orchestrator",
   "displayName": "Orchestrator Fugu",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Claude-native dynamic workflows with learned model routing, adversarial personas, lifecycle telemetry, and Codex delegation.",
   "author": {
     "name": "Saqrion AI"

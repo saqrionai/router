@@ -176,6 +176,13 @@ judgment, the skill performs one serialized checkpoint containing the task,
 workflow id, stop reason, queue, models, and verdict. Only acceptance closes the
 issue.
 
+After that checkpoint, a separate serialized admission boundary may persist a
+small number of workflow discoveries. New issues require a durable category,
+exact acceptance criteria, a reproducible check, and typed concrete evidence.
+New blocking edges additionally require high confidence and the exact blocked
+criterion. Duplicate or unsupported proposals remain native run evidence and
+never enter project history.
+
 The workflow's in-memory queue remains native run state. Claude Code persists it
 for interruption and resumption.
 

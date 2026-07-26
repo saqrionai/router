@@ -162,6 +162,8 @@ def test_two_bead_delivery_uses_isolated_owners_and_parallel_checks() -> None:
     assert "owner commit is not present in serial integration evidence" in final
     assert "writing owner returned no check evidence" in final
     assert "result.decision === 'accept'" in final
+    assert "admit_discoveries" in skill
+    assert "Dependency hypotheses from frontier planning are never sufficient" in skill
 
 
 def test_frontier_final_gate_requires_exact_supported_criteria() -> None:

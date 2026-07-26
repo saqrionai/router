@@ -156,6 +156,23 @@ class BeadsBridgeTests(unittest.TestCase):
             bridge._release_issue_lease(root, "one")
             other._release_issue_lease(root, "two")
 
+    def test_discovery_evidence_rejects_vague_observations(self) -> None:
+        with self.assertRaisesRegex(ValueError, "concrete observation"):
+            BeadsBridge._validated_discovery_evidence(
+                [{"type": "test", "source": "pytest", "observation": "fails"}]
+            )
+
+        evidence = BeadsBridge._validated_discovery_evidence(
+            [
+                {
+                    "type": "test",
+                    "source": "pytest -q tests/test_delivery.py",
+                    "observation": "test_delivery fails with exit code 1",
+                }
+            ]
+        )
+        self.assertEqual(evidence[0]["type"], "test")
+
     def test_resolved_task_hydrates_continue_from_bead(self) -> None:
         snapshot = {
             "id": "ios-123",

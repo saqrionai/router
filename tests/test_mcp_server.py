@@ -107,6 +107,7 @@ def test_stdio_protocol_lists_and_calls_tools(tmp_path: Path) -> None:
         "prepare_bead",
         "prepare_frontier",
         "checkpoint_bead",
+        "admit_discoveries",
     }
     assert (
         responses[2]["result"]["structuredContent"]["execution_plane"]

@@ -14,6 +14,8 @@ Fugu is a policy service inside the Claude Code plugin:
    fallback orders.
 4. Claude Code's native `fugu-forum` workflow executes the selected queue.
 5. `checkpoint_bead` records terminal per-unit outcomes for future routing.
+6. `admit_discoveries` may persist a bounded evidenced issue or dependency;
+   routing hypotheses alone cannot mutate Beads.
 
 Fugu never launches a worker, creates a second execution graph, or manages a
 retry loop.

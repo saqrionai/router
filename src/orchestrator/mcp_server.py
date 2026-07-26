@@ -212,6 +212,26 @@ class FuguMcpServer:
                     },
                 },
             },
+            {
+                "name": "admit_discoveries",
+                "description": (
+                    "Serialize evidence-gated creation of durable discovered "
+                    "issues or dependency edges. Unsupported hypotheses are rejected."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["workspace", "source_issue_id", "discoveries"],
+                    "properties": {
+                        "workspace": {"type": "string", "minLength": 1},
+                        "source_issue_id": {"type": "string", "minLength": 1},
+                        "discoveries": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {"type": "object"},
+                        },
+                    },
+                },
+            },
         ]
 
     def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -380,6 +400,19 @@ class FuguMcpServer:
                 raise ValueError("selections must be an array of objects")
             workspace = Path(str(arguments.get("workspace") or "")).expanduser()
             return self.beads.prepare_frontier(workspace, raw_selections)
+        if name == "admit_discoveries":
+            raw_discoveries = arguments.get("discoveries")
+            if not isinstance(raw_discoveries, list) or not all(
+                isinstance(item, dict) for item in raw_discoveries
+            ):
+                raise ValueError("discoveries must be an array of objects")
+            workspace = Path(str(arguments.get("workspace") or "")).expanduser()
+            source_issue_id = str(arguments.get("source_issue_id") or "")
+            return self.beads.admit_discoveries(
+                workspace,
+                source_issue_id,
+                raw_discoveries,
+            )
         if name == "checkpoint_bead":
             raw_queue = arguments.get("queue")
             if not isinstance(raw_queue, list) or not all(

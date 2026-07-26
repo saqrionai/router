@@ -70,3 +70,11 @@ independently actionable investigation. Add a dependency edge only when the
 source issue cannot advance or be accepted without the target issue and the
 relationship has concrete evidence. Tentative ideas, possible bugs, and
 uncertain dependency guesses remain in native workflow state until verified.
+
+Durable admission is a serialized MCP boundary after the source Bead's
+checkpoint. Every issue requires exact acceptance criteria, a reproducible
+check, and typed artifact, command, test, device, or log evidence. Every edge
+also requires high confidence and the exact blocked criterion. Exact-title
+duplicates, existing edges, self-edges, low-confidence relations, and vague
+observations are rejected without mutation and are not retried with weaker
+wording.

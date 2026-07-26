@@ -315,3 +315,89 @@ def test_frontier_batch_claims_and_releases_two_real_beads(
     )
     assert observer._acquire_issue_lease(tmp_path, issue_ids[1]) is True
     observer._release_issue_lease(tmp_path, issue_ids[1])
+
+
+@pytest.mark.skipif(resolve_bd_binary() is None, reason="bd is not installed")
+def test_discovery_admission_persists_only_evidenced_nonduplicates(
+    tmp_path: Path,
+) -> None:
+    run(tmp_path, "git", "init", "-q")
+    run(tmp_path, "git", "config", "user.name", "Saqrion Test")
+    run(tmp_path, "git", "config", "user.email", "test@example.invalid")
+    run(
+        tmp_path,
+        "bd",
+        "init",
+        "--non-interactive",
+        "--skip-agents",
+        "--skip-hooks",
+        "--prefix",
+        "discover",
+        "--quiet",
+    )
+    source_id = run(tmp_path, "bd", "create", "Source delivery", "--silent")
+    required_id = run(
+        tmp_path,
+        "bd",
+        "create",
+        "Required foundation",
+        "--silent",
+    )
+    evidence = [
+        {
+            "type": "test",
+            "source": "pytest -q tests/test_delivery.py",
+            "observation": "test_delivery fails reproducibly with exit code 1",
+        }
+    ]
+    issue = {
+        "kind": "issue",
+        "title": "Capture delivery regression evidence",
+        "description": (
+            "Preserve the reproducible delivery failure and add a focused fix."
+        ),
+        "durable_reason": "reproducible-blocker",
+        "acceptance_criteria": ["the focused delivery test passes"],
+        "reproducible_check": "pytest -q tests/test_delivery.py",
+        "evidence": evidence,
+        "issue_type": "bug",
+        "priority": 1,
+    }
+    dependency = {
+        "kind": "dependency",
+        "issue_id": source_id,
+        "depends_on_id": required_id,
+        "confidence": "high",
+        "blocked_criterion": "source delivery cannot pass its focused test",
+        "reproducible_check": "pytest -q tests/test_delivery.py",
+        "evidence": evidence,
+    }
+    low_confidence = {**dependency, "confidence": "medium"}
+
+    result = BeadsBridge().admit_discoveries(
+        tmp_path,
+        source_id,
+        [issue, dict(issue), dependency, low_confidence],
+    )
+
+    assert result["admitted_count"] == 2
+    assert result["rejected_count"] == 2
+    assert any("duplicate title" in item["reason"] for item in result["rejected"])
+    assert any("confidence must be high" in item["reason"] for item in result["rejected"])
+    issues = json.loads(run(tmp_path, "bd", "list", "--all", "--json", "--limit", "0"))
+    assert sum(
+        item["title"] == "Capture delivery regression evidence"
+        for item in issues
+    ) == 1
+    dependencies = json.loads(
+        run(tmp_path, "bd", "dep", "list", source_id, "--json")
+    )
+    assert any(
+        item["id"] == required_id and item["dependency_type"] == "blocks"
+        for item in dependencies
+    )
+    comments = json.dumps(
+        json.loads(run(tmp_path, "bd", "comments", source_id, "--json"))
+    )
+    assert "Evidence-gated" in comments
+    assert "pytest -q tests/test_delivery.py" in comments

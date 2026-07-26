@@ -15,7 +15,8 @@ Orchestrator contributes:
 - no-progress and round-budget stops;
 - structural UltraCheck gates;
 - serialized Beads intake and result checkpoints;
-- delivery-first best-first selection across the ready Beads frontier; and
+- delivery-first best-first selection across the ready Beads frontier;
+- evidence-gated admission of durable discovered issues and dependencies; and
 - normalized native lifecycle and tool telemetry.
 
 This repository is Saqrion's internal engineering harness. It is not the

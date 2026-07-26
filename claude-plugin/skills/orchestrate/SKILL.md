@@ -12,6 +12,7 @@ allowed-tools:
   - mcp__plugin_orchestrator_fugu__prepare_bead
   - mcp__plugin_orchestrator_fugu__prepare_frontier
   - mcp__plugin_orchestrator_fugu__checkpoint_bead
+  - mcp__plugin_orchestrator_fugu__admit_discoveries
   - Agent(orchestrator:opus-worker, orchestrator:opus-48-recovery, orchestrator:fable-neutral, orchestrator:codex-worker, orchestrator:frontier-planner, orchestrator:sweep-opus-worker, orchestrator:sweep-codex-worker, orchestrator:sweep-integrator)
   - TaskCreate
   - TaskUpdate
@@ -119,7 +120,9 @@ If the task is empty, ask for it. Otherwise:
    or `inconclusive` for infrastructure failure. A failed sibling never
    downgrades an accepted independent Bead. Checkpoint order follows frontier
    order so Beads history and lease release are deterministic.
-9. Report both Bead outcomes, commits, integration checks, checker routes, and
+9. Apply the evidence-admission policy below separately to each checkpointed
+   Bead. A sibling's evidence cannot create work under the other Bead.
+10. Report both Bead outcomes, commits, integration checks, checker routes, and
    smallest remaining blockers. Then stop. The next `continue` reranks the
    frontier from the newly persisted state rather than recursing in one
    context.
@@ -206,9 +209,51 @@ ceilings even if a larger value is supplied.
    routing or workflow startup fails after preparation, checkpoint
    `inconclusive` with stop reason `infrastructure-failure` and an empty queue;
    this keeps the Bead in progress while releasing its live-client lease.
-11. Report the judgment, stop reason, queue totals, routed models, and real
+11. After checkpointing, apply the evidence-admission policy below to concrete
+   owner or checker discoveries. Admission failure does not change the run's
+   verdict and must not be retried informally.
+12. Report the judgment, stop reason, queue totals, routed models, and real
    verification results. A blocked, rejected, no-progress, round-limited, or
    inconclusive result is not success.
+
+## Evidence Admission
+
+Do not turn every `nextAction`, hypothesis, review suggestion, or possible bug
+into a Bead. Call `mcp__plugin_orchestrator_fugu__admit_discoveries` only when
+the returned run evidence supports at most four durable discoveries for that
+source Bead. The MCP serializes all writes, suppresses duplicates, and records
+an audit comment. Use one of these contracts:
+
+```json
+{
+  "kind": "issue",
+  "title": "durable and specific title",
+  "description": "observed problem or deliverable and why it matters",
+  "durable_reason": "deliverable|reproducible-blocker|independently-actionable-investigation",
+  "acceptance_criteria": ["exact observable completion condition"],
+  "reproducible_check": "bounded command or device procedure",
+  "evidence": [{"type": "artifact|command|test|device|log", "source": "path or command", "observation": "concrete observed result"}],
+  "issue_type": "bug|feature|task|chore",
+  "priority": 2
+}
+```
+
+```json
+{
+  "kind": "dependency",
+  "issue_id": "blocked Bead",
+  "depends_on_id": "required Bead",
+  "confidence": "high",
+  "blocked_criterion": "exact criterion that cannot advance",
+  "reproducible_check": "bounded check demonstrating the dependency",
+  "evidence": [{"type": "artifact|command|test|device|log", "source": "path or command", "observation": "concrete observed result"}]
+}
+```
+
+Dependency hypotheses from frontier planning are never sufficient by
+themselves. Promote one only after owner or checker evidence demonstrates the
+blocked criterion. Rejected admissions remain ephemeral run evidence; do not
+weaken the contract or bypass the MCP.
 
 Use a normal single-agent turn instead when the task is narrow enough that
 independent evidence gathering and verification would add no value.

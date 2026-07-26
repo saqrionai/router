@@ -39,6 +39,12 @@ class BeadsBridge:
         r"\b(continue|resume|keep going|pick up where|next bead|next task)\b",
         re.IGNORECASE,
     )
+    DISCOVERY_REASONS = {
+        "deliverable",
+        "reproducible-blocker",
+        "independently-actionable-investigation",
+    }
+    EVIDENCE_TYPES = {"artifact", "command", "test", "device", "log"}
 
     def __init__(self) -> None:
         self._leases: dict[tuple[Path, str], TextIO] = {}
@@ -218,6 +224,241 @@ class BeadsBridge:
             "atomic_leases": True,
             "issues": prepared,
         }
+
+    def admit_discoveries(
+        self,
+        workspace: Path,
+        source_issue_id: str,
+        discoveries: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Persist only reproducible, non-duplicate workflow discoveries."""
+        self._validate_issue_id(source_issue_id)
+        if len(discoveries) > 8:
+            raise ValueError("at most 8 discoveries may be admitted per call")
+        workspace = workspace.expanduser().resolve()
+        beads_root = self._beads_root(workspace)
+        if beads_root is None:
+            return {
+                "enabled": False,
+                "reason": f"no .beads directory under {workspace}",
+            }
+        with self._workspace_lock(beads_root):
+            self.snapshot(workspace, source_issue_id)
+            existing = self._list_issues(
+                workspace,
+                ["bd", "list", "--all", "--json", "--limit", "0"],
+            )
+            title_ids = {
+                self._title_fingerprint(str(item.get("title") or "")): str(
+                    item.get("id") or ""
+                )
+                for item in existing
+                if item.get("title") and item.get("id")
+            }
+            admitted: list[dict[str, Any]] = []
+            rejected: list[dict[str, Any]] = []
+            for index, discovery in enumerate(discoveries):
+                kind = str(discovery.get("kind") or "").strip()
+                try:
+                    if kind == "issue":
+                        result = self._admit_issue(
+                            workspace,
+                            source_issue_id,
+                            discovery,
+                            title_ids,
+                        )
+                    elif kind == "dependency":
+                        result = self._admit_dependency(workspace, discovery)
+                    else:
+                        raise ValueError("kind must be issue or dependency")
+                except (BeadsError, ValueError) as exc:
+                    rejected.append(
+                        {
+                            "index": index,
+                            "kind": kind or "unknown",
+                            "reason": str(exc),
+                        }
+                    )
+                    continue
+                admitted.append(result)
+            if admitted:
+                lines = [
+                    "Evidence-gated workflow discoveries admitted",
+                    "",
+                    *(
+                        f"- {item['kind']}: "
+                        f"{item.get('issue_id') or item.get('edge')}"
+                        for item in admitted
+                    ),
+                ]
+                self.comment(workspace, source_issue_id, "\n".join(lines))
+        return {
+            "enabled": True,
+            "source_issue_id": source_issue_id,
+            "admitted": admitted,
+            "rejected": rejected,
+            "admitted_count": len(admitted),
+            "rejected_count": len(rejected),
+        }
+
+    def _admit_issue(
+        self,
+        workspace: Path,
+        source_issue_id: str,
+        discovery: dict[str, Any],
+        title_ids: dict[str, str],
+    ) -> dict[str, Any]:
+        title = " ".join(str(discovery.get("title") or "").split())
+        description = str(discovery.get("description") or "").strip()
+        reason = str(discovery.get("durable_reason") or "").strip()
+        acceptance = discovery.get("acceptance_criteria")
+        check = str(discovery.get("reproducible_check") or "").strip()
+        evidence = self._validated_discovery_evidence(discovery.get("evidence"))
+        if len(title) < 8 or len(title) > 120:
+            raise ValueError("issue title must contain between 8 and 120 characters")
+        if len(description) < 20:
+            raise ValueError("issue description must contain at least 20 characters")
+        if reason not in self.DISCOVERY_REASONS:
+            raise ValueError("issue durable_reason is not admissible")
+        if not isinstance(acceptance, list) or not acceptance:
+            raise ValueError("issue acceptance_criteria must be a non-empty array")
+        acceptance = [str(item).strip() for item in acceptance]
+        if any(not item for item in acceptance):
+            raise ValueError("issue acceptance criteria must be non-empty")
+        if not check:
+            raise ValueError("issue reproducible_check must be non-empty")
+        fingerprint = self._title_fingerprint(title)
+        if fingerprint in title_ids:
+            raise ValueError(f"duplicate title matches {title_ids[fingerprint]}")
+        issue_type = str(discovery.get("issue_type") or "task").strip()
+        if issue_type not in {"bug", "feature", "task", "chore"}:
+            raise ValueError("issue_type must be bug, feature, task, or chore")
+        raw_priority = discovery.get("priority", 2)
+        try:
+            priority = int(str(raw_priority).upper().removeprefix("P"))
+        except ValueError as exc:
+            raise ValueError("priority must be between 0 and 4") from exc
+        if priority < 0 or priority > 4:
+            raise ValueError("priority must be between 0 and 4")
+        evidence_text = "\n".join(
+            f"- {item['type']} {item['source']}: {item['observation']}"
+            for item in evidence
+        )
+        completed = self._run(
+            workspace,
+            [
+                "bd",
+                "create",
+                title,
+                "--description",
+                (
+                    f"{description}\n\nDurable reason: {reason}\n"
+                    f"Reproducible check: {check}\nEvidence:\n{evidence_text}"
+                )[:12_000],
+                "--acceptance",
+                "\n".join(f"- {item}" for item in acceptance)[:12_000],
+                "--type",
+                issue_type,
+                "--priority",
+                str(priority),
+                "--labels",
+                "orchestrator-discovery,evidence-admitted",
+                "--deps",
+                f"discovered-from:{source_issue_id}",
+                "--silent",
+            ],
+        )
+        issue_id = completed.stdout.strip().splitlines()[-1]
+        self._validate_issue_id(issue_id)
+        title_ids[fingerprint] = issue_id
+        return {
+            "kind": "issue",
+            "issue_id": issue_id,
+            "title": title,
+            "durable_reason": reason,
+        }
+
+    def _admit_dependency(
+        self,
+        workspace: Path,
+        discovery: dict[str, Any],
+    ) -> dict[str, Any]:
+        issue_id = str(discovery.get("issue_id") or "").strip()
+        depends_on_id = str(discovery.get("depends_on_id") or "").strip()
+        confidence = str(discovery.get("confidence") or "").strip()
+        blocked_criterion = str(discovery.get("blocked_criterion") or "").strip()
+        check = str(discovery.get("reproducible_check") or "").strip()
+        evidence = self._validated_discovery_evidence(discovery.get("evidence"))
+        self._validate_issue_id(issue_id)
+        self._validate_issue_id(depends_on_id)
+        if issue_id == depends_on_id:
+            raise ValueError("dependency cannot reference itself")
+        if confidence != "high":
+            raise ValueError("dependency confidence must be high")
+        if not blocked_criterion:
+            raise ValueError("dependency blocked_criterion must be non-empty")
+        if not check:
+            raise ValueError("dependency reproducible_check must be non-empty")
+        snapshot = self.snapshot(workspace, issue_id)
+        self.snapshot(workspace, depends_on_id)
+        dependencies = snapshot.get("dependencies")
+        if isinstance(dependencies, list) and any(
+            isinstance(item, dict)
+            and item.get("id") == depends_on_id
+            and item.get("dependency_type") == "blocks"
+            for item in dependencies
+        ):
+            raise ValueError("dependency edge already exists")
+        self._run(workspace, ["bd", "dep", "add", issue_id, depends_on_id])
+        evidence_text = "; ".join(
+            f"{item['type']} {item['source']}: {item['observation']}"
+            for item in evidence
+        )
+        self.comment(
+            workspace,
+            issue_id,
+            (
+                f"Evidence-gated dependency admitted: {issue_id} depends on "
+                f"{depends_on_id}\nBlocked criterion: {blocked_criterion}\n"
+                f"Reproducible check: {check}\nEvidence: {evidence_text}"
+            )[:8_000],
+        )
+        return {
+            "kind": "dependency",
+            "edge": f"{issue_id}->{depends_on_id}",
+            "issue_id": issue_id,
+            "depends_on_id": depends_on_id,
+        }
+
+    @classmethod
+    def _validated_discovery_evidence(cls, value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list) or not value:
+            raise ValueError("discovery evidence must be a non-empty array")
+        evidence: list[dict[str, str]] = []
+        for item in value:
+            if not isinstance(item, dict):
+                raise ValueError("each discovery evidence item must be an object")
+            evidence_type = str(item.get("type") or "").strip()
+            source = str(item.get("source") or "").strip()
+            observation = str(item.get("observation") or "").strip()
+            if evidence_type not in cls.EVIDENCE_TYPES:
+                raise ValueError("discovery evidence type is not admissible")
+            if not source or len(observation) < 10:
+                raise ValueError(
+                    "discovery evidence needs a source and concrete observation"
+                )
+            evidence.append(
+                {
+                    "type": evidence_type,
+                    "source": source[:1_000],
+                    "observation": observation[:4_000],
+                }
+            )
+        return evidence
+
+    @staticmethod
+    def _title_fingerprint(title: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
 
     def _prepare_locked(
         self,
